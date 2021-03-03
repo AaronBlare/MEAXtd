@@ -1,8 +1,6 @@
-# Config file for automatic testing at travis-ci.org
-
 language: python
 python:
-  - "3.8_with_system_site_packages"
+- 3.8
 sudo: required
 dist: trusty
 notifications:
