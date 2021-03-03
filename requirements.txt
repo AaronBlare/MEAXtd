@@ -13,3 +13,5 @@ PyVirtualDisplay==2.1
 setuptools==47.1.0
 PySide2==5.15.2
 pyqt5==5.15.3
+flake8==3.8.4
+tox==3.23.0
