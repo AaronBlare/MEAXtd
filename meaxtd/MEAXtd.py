@@ -1,10 +1,10 @@
 import sys
-
 import pkg_resources
 from PySide2.QtCore import Qt
 from PySide2.QtGui import QIcon
 from PySide2.QtWidgets import (QAction, QApplication, QDesktopWidget, QDialog, QFileDialog,
                                QHBoxLayout, QLabel, QMainWindow, QToolBar, QVBoxLayout, QWidget)
+from meaxtd.read_h5 import read_h5_file
 
 
 class MEAXtd(QMainWindow):
@@ -64,23 +64,21 @@ class MEAXtd(QMainWindow):
     def tool_bar_items(self):
         """Create a tool bar for the main window."""
         self.tool_bar = QToolBar()
-        self.addToolBar(Qt.TopToolBarArea, self.tool_bar)
-        self.tool_bar.setMovable(False)
+        # self.addToolBar(Qt.TopToolBarArea, self.tool_bar)
+        # self.tool_bar.setMovable(False)
 
-        open_icon = pkg_resources.resource_filename('meaxtd.images',
-                                                    'ic_open_in_new_black_48dp_1x.png')
-        tool_bar_open_action = QAction(QIcon(open_icon), 'Open File', self)
-        tool_bar_open_action.triggered.connect(self.open_file)
+        # open_icon = pkg_resources.resource_filename('meaxtd.images', 'ic_open_in_new_black_48dp_1x.png')
+        # tool_bar_open_action = QAction(QIcon(open_icon), 'Open File', self)
+        # tool_bar_open_action.triggered.connect(self.open_file)
 
-        self.tool_bar.addAction(tool_bar_open_action)
+        # self.tool_bar.addAction(tool_bar_open_action)
 
     def open_file(self):
         """Open a QFileDialog to allow the user to open a file into the application."""
-        filename, accepted = QFileDialog.getOpenFileName(self, 'Open File')
+        filename, accepted = QFileDialog.getOpenFileName(self, 'Open File', filter="*.h5")
 
         if accepted:
-            with open(filename) as file:
-                file.read()
+            read_h5_file(filename)
 
 
 class AboutDialog(QDialog):
