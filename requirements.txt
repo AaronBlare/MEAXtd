@@ -10,7 +10,6 @@ EasyProcess==0.3
 pytest-qt==3.3.0
 coverage==5.5
 PyVirtualDisplay==2.1
-setuptools==52.0.0.post20210125
 PySide2==5.15.2
 pyqt5==5.15.3
 flake8==3.8.4

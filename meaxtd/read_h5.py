@@ -2,6 +2,7 @@ import McsPy.McsData
 import McsPy.McsCMOS
 import numpy as np
 from McsPy import ureg, Q_
+from meaxtd.data import Data
 
 
 def read_h5_file(data_path):
@@ -17,4 +18,8 @@ def read_h5_file(data_path):
     scale_factor_for_second = Q_(1, time[1]).to(ureg.s).magnitude
     time_in_sec = time[0] * scale_factor_for_second
 
-    return np_analog_stream_0_data, time_in_sec
+    data = Data()
+    data.stream = np_analog_stream_0_data
+    data.time = time_in_sec
+
+    return data

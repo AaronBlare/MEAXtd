@@ -1,10 +1,13 @@
 import sys
 import pkg_resources
-from PySide2.QtCore import Qt
-from PySide2.QtGui import QIcon
-from PySide2.QtWidgets import (QAction, QApplication, QDesktopWidget, QDialog, QFileDialog,
-                               QHBoxLayout, QLabel, QMainWindow, QToolBar, QVBoxLayout, QWidget)
+import pyqtgraph as pg
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import (QAction, QApplication, QDesktopWidget, QDialog, QFileDialog,
+                             QHBoxLayout, QLabel, QMainWindow, QToolBar, QVBoxLayout, QWidget,
+                             QGroupBox, QGridLayout, QPushButton)
 from meaxtd.read_h5 import read_h5_file
+from meaxtd.hdf5plot import HDF5Plot
 
 
 class MEAXtd(QMainWindow):
@@ -30,6 +33,7 @@ class MEAXtd(QMainWindow):
 
         self.file_menu()
         self.help_menu()
+        self.plot_button()
 
         self.tool_bar_items()
 
@@ -73,12 +77,28 @@ class MEAXtd(QMainWindow):
 
         # self.tool_bar.addAction(tool_bar_open_action)
 
+    def plot_button(self):
+        hbox = QHBoxLayout()
+        self.qbtn = QPushButton('Plot Signals', self)
+        self.qbtn.setEnabled(False)
+        self.qbtn.resize(300, 100)
+        self.qbtn.move(100, 100)
+        hbox.addWidget(self.qbtn)
+        hbox.addStretch(1)
+        self.setLayout(hbox)
+        self.qbtn.clicked.connect(lambda: self.plot_data())
+
     def open_file(self):
         """Open a QFileDialog to allow the user to open a file into the application."""
         filename, accepted = QFileDialog.getOpenFileName(self, 'Open File', filter="*.h5")
 
         if accepted:
-            read_h5_file(filename)
+            self.data = read_h5_file(filename)
+            self.qbtn.setEnabled(True)
+
+    def plot_data(self):
+        self.plot = PlotDialog(self.data)
+        self.plot.show()
 
 
 class AboutDialog(QDialog):
@@ -113,12 +133,58 @@ class AboutDialog(QDialog):
         self.setLayout(self.layout)
 
 
+class PlotDialog(QDialog):
+
+    def __init__(self, data):
+        super().__init__()
+        self.data = data
+        self.initUI()
+
+    def initUI(self):
+        self.createGridLayout()
+        self.resize(2000, 800)
+        windowLayout = QVBoxLayout()
+        windowLayout.addWidget(self.horizontalGroupBox)
+        self.setLayout(windowLayout)
+        self.show()
+
+    def createGridLayout(self):
+        self.horizontalGroupBox = QGroupBox()
+        layout = QGridLayout()
+
+        num_rows = 12
+        num_columns = 5
+
+        plots = []
+
+        for row_id in range(0, num_rows):
+            layout.setColumnStretch(row_id, num_columns)
+
+        for col_id in range(0, num_columns):
+            for row_id in range(0, num_rows):
+                curr_id = col_id * num_rows + row_id
+                curr_plot = pg.PlotWidget(title='#' + str(curr_id + 1))
+                curr_plot.enableAutoRange(False, False)
+                curr_plot.setXRange(0, 500)
+                curve = HDF5Plot()
+                curr_data = self.data.stream[:, curr_id]
+                curve.setHDF5(curr_data)
+                curr_plot.addItem(curve)
+                layout.addWidget(curr_plot, col_id, row_id)
+                plots.append(curr_plot)
+                if curr_id > 0:
+                    plots[curr_id - 1].getViewBox().setXLink(plots[curr_id])
+                    plots[curr_id - 1].getViewBox().setYLink(plots[curr_id])
+
+        self.horizontalGroupBox.setLayout(layout)
+
+
 def main(args=sys.argv):
     application = QApplication(args)
     window = MEAXtd()
     desktop = QDesktopWidget().availableGeometry()
-    width = (desktop.width() - window.width()) / 2
-    height = (desktop.height() - window.height()) / 2
+    width = (desktop.width() - window.width()) / 4
+    height = (desktop.height() - window.height()) / 4
     window.show()
     window.move(width, height)
     sys.exit(application.exec_())
