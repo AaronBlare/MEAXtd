@@ -1,13 +1,15 @@
 import sys
 import pkg_resources
 import pyqtgraph as pg
+import numpy as np
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (QAction, QApplication, QDesktopWidget, QDialog, QFileDialog,
                              QHBoxLayout, QLabel, QMainWindow, QToolBar, QVBoxLayout, QWidget,
                              QGroupBox, QGridLayout, QPushButton)
 from meaxtd.read_h5 import read_h5_file
-from meaxtd.hdf5plot import HDF5Plot
+from meaxtd.hdf5plot import HDF5Plot, HDF5Point
+from meaxtd.find_spikes import find_spikes
 
 
 class MEAXtd(QMainWindow):
@@ -34,6 +36,7 @@ class MEAXtd(QMainWindow):
         self.file_menu()
         self.help_menu()
         self.plot_button()
+        self.spike_button()
 
         self.tool_bar_items()
 
@@ -70,23 +73,32 @@ class MEAXtd(QMainWindow):
         self.tool_bar = QToolBar()
         # self.addToolBar(Qt.TopToolBarArea, self.tool_bar)
         # self.tool_bar.setMovable(False)
-
         # open_icon = pkg_resources.resource_filename('meaxtd.images', 'ic_open_in_new_black_48dp_1x.png')
         # tool_bar_open_action = QAction(QIcon(open_icon), 'Open File', self)
         # tool_bar_open_action.triggered.connect(self.open_file)
-
         # self.tool_bar.addAction(tool_bar_open_action)
 
     def plot_button(self):
         hbox = QHBoxLayout()
-        self.qbtn = QPushButton('Plot Signals', self)
-        self.qbtn.setEnabled(False)
-        self.qbtn.resize(300, 100)
-        self.qbtn.move(100, 100)
-        hbox.addWidget(self.qbtn)
+        self.plotqbtn = QPushButton('Plot Signals', self)
+        self.plotqbtn.setEnabled(False)
+        self.plotqbtn.resize(200, 100)
+        self.plotqbtn.move(100, 100)
+        hbox.addWidget(self.plotqbtn)
         hbox.addStretch(1)
         self.setLayout(hbox)
-        self.qbtn.clicked.connect(lambda: self.plot_data())
+        self.plotqbtn.clicked.connect(lambda: self.plot_data())
+
+    def spike_button(self):
+        hbox = QHBoxLayout()
+        self.spikeqbtn = QPushButton('Find Spikes', self)
+        self.spikeqbtn.setEnabled(False)
+        self.spikeqbtn.resize(200, 100)
+        self.spikeqbtn.move(100, 400)
+        hbox.addWidget(self.spikeqbtn)
+        hbox.addStretch(1)
+        self.setLayout(hbox)
+        self.spikeqbtn.clicked.connect(lambda: self.find_spikes())
 
     def open_file(self):
         """Open a QFileDialog to allow the user to open a file into the application."""
@@ -94,10 +106,17 @@ class MEAXtd(QMainWindow):
 
         if accepted:
             self.data = read_h5_file(filename)
-            self.qbtn.setEnabled(True)
+            self.plotqbtn.setEnabled(True)
+            self.spikeqbtn.setEnabled(True)
 
     def plot_data(self):
         self.plot = PlotDialog(self.data)
+        self.plot.show()
+
+    def find_spikes(self):
+        if not self.data.spikes:
+            find_spikes(self.data)
+        self.plot = PlotDialog(self.data, type='spike')
         self.plot.show()
 
 
@@ -135,9 +154,10 @@ class AboutDialog(QDialog):
 
 class PlotDialog(QDialog):
 
-    def __init__(self, data):
+    def __init__(self, data, type=None):
         super().__init__()
         self.data = data
+        self.type = type
         self.initUI()
 
     def initUI(self):
@@ -170,6 +190,12 @@ class PlotDialog(QDialog):
                 curr_data = self.data.stream[:, curr_id]
                 curve.setHDF5(curr_data)
                 curr_plot.addItem(curve)
+                if self.type == 'spike':
+                    spike_times = self.data.spikes[curr_id]
+                    spike_ampls = self.data.spikes_amplitudes[curr_id]
+                    points = HDF5Point()
+                    points.setHDF5(spike_times, spike_ampls)
+                    curr_plot.addItem(points)
                 layout.addWidget(curr_plot, col_id, row_id)
                 plots.append(curr_plot)
                 if curr_id > 0:
