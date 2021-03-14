@@ -66,12 +66,12 @@ class HDF5Plot(pg.PlotCurveItem):
         self.scale(scale, 1)
 
 
-class HDF5Point(pg.PlotCurveItem):
+class HDF5Point(pg.ScatterPlotItem):
     def __init__(self, *args, **kwds):
         self.x = None
         self.y = None
         self.limit = 10000
-        pg.PlotCurveItem.__init__(self, *args, **kwds)
+        pg.ScatterPlotItem.__init__(self, *args, **kwds)
 
     def setHDF5(self, x, y):
         self.x = x
@@ -109,10 +109,12 @@ class HDF5Point(pg.PlotCurveItem):
 
             chunkSize = (1000000 // ds) * ds
             while sourcePtr < stop - 1:
-                xchunk = self.x[sourcePtr:min(stop, sourcePtr + chunkSize)]
-                ychunk = self.y[sourcePtr:min(stop, sourcePtr + chunkSize)]
+                xchunk = [self.x[i] for i in range(0, len(self.x)) if
+                          self.x[i] >= sourcePtr and self.x[i] < min(stop, sourcePtr + chunkSize)]
+                ychunk = [self.y[i] for i in range(0, len(self.y)) if
+                          self.y[i] >= sourcePtr and self.y[i] < min(stop, sourcePtr + chunkSize)]
 
-                sourcePtr += len(xchunk)
+                sourcePtr += min(stop, sourcePtr + chunkSize) - sourcePtr + 1
 
                 xchunk = xchunk[:(len(xchunk) // ds) * ds].reshape(len(xchunk) // ds, ds)
                 ychunk = ychunk[:(len(ychunk) // ds) * ds].reshape(len(ychunk) // ds, ds)
@@ -133,7 +135,7 @@ class HDF5Point(pg.PlotCurveItem):
             yvisible = yvisible[:targetPtr]
             scale = ds * 0.5
 
-        self.setData(x=self.x, y=self.y, size=10, pen=pg.mkPen('r'), brush='b', symbol='o', symbolBrush='w')
+        self.setData(x=self.x, y=self.y, size=10, pen=pg.mkPen(None), brush='b', symbol='o', symbolBrush='w')
         self.setPos(start, 0)
         self.resetTransform()
         self.scale(scale, 1)

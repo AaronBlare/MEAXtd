@@ -193,9 +193,11 @@ class PlotDialog(QDialog):
                 if self.type == 'spike':
                     spike_times = self.data.spikes[curr_id]
                     spike_ampls = self.data.spikes_amplitudes[curr_id]
-                    points = HDF5Point()
-                    points.setHDF5(spike_times, spike_ampls)
-                    curr_plot.addItem(points)
+                    curr_plot.plot(x=spike_times, y=spike_ampls, size=10, pen=pg.mkPen(None), brush='b', symbol='o',
+                                   symbolBrush='w')
+                    # points = HDF5Point()
+                    # points.setHDF5(spike_times, spike_ampls)
+                    # curr_plot.addItem(points)
                 layout.addWidget(curr_plot, col_id, row_id)
                 plots.append(curr_plot)
                 if curr_id > 0:
