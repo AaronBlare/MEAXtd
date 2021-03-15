@@ -7,3 +7,4 @@ class Data:
         self.time = np.empty(shape=(1, 1))
         self.spikes = {}
         self.spikes_amplitudes = {}
+        self.bursts = {}

@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (QAction, QApplication, QDesktopWidget, QDialog, QFi
                              QGroupBox, QGridLayout, QPushButton)
 from meaxtd.read_h5 import read_h5_file
 from meaxtd.hdf5plot import HDF5Plot, HDF5Point
-from meaxtd.find_spikes import find_spikes
+from meaxtd.find_bursts import find_spikes, find_bursts
 
 
 class MEAXtd(QMainWindow):
@@ -106,6 +106,7 @@ class MEAXtd(QMainWindow):
 
         if accepted:
             self.data = read_h5_file(filename)
+            find_bursts(self.data)
             self.plotqbtn.setEnabled(True)
             self.spikeqbtn.setEnabled(True)
 
