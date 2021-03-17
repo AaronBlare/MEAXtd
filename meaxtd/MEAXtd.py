@@ -1,15 +1,14 @@
 import sys
 import pkg_resources
 import pyqtgraph as pg
-import numpy as np
+from meaxtd.read_h5 import read_h5_file
+from meaxtd.hdf5plot import HDF5Plot, HDF5Point
+from meaxtd.find_bursts import find_spikes, find_bursts
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (QAction, QApplication, QDesktopWidget, QDialog, QFileDialog,
                              QHBoxLayout, QLabel, QMainWindow, QToolBar, QVBoxLayout, QWidget,
-                             QGroupBox, QGridLayout, QPushButton)
-from meaxtd.read_h5 import read_h5_file
-from meaxtd.hdf5plot import HDF5Plot, HDF5Point
-from meaxtd.find_bursts import find_spikes, find_bursts
+                             QGroupBox, QGridLayout, QPushButton, QComboBox)
 
 
 class MEAXtd(QMainWindow):
@@ -106,7 +105,7 @@ class MEAXtd(QMainWindow):
 
         if accepted:
             self.data = read_h5_file(filename)
-            find_bursts(self.data)
+            # find_bursts(self.data)
             self.plotqbtn.setEnabled(True)
             self.spikeqbtn.setEnabled(True)
 
@@ -117,7 +116,7 @@ class MEAXtd(QMainWindow):
     def find_spikes(self):
         if not self.data.spikes:
             find_spikes(self.data)
-        self.plot = PlotDialog(self.data, type='spike')
+        self.plot = PlotDialog(self.data)
         self.plot.show()
 
 
@@ -155,17 +154,18 @@ class AboutDialog(QDialog):
 
 class PlotDialog(QDialog):
 
-    def __init__(self, data, type=None):
+    def __init__(self, data):
         super().__init__()
         self.data = data
-        self.type = type
         self.initUI()
 
     def initUI(self):
         self.createGridLayout()
-        self.resize(2000, 800)
+        self.createButtonLayout()
+        self.resize(2000, 900)
         windowLayout = QVBoxLayout()
         windowLayout.addWidget(self.horizontalGroupBox)
+        windowLayout.addWidget(self.buttonGroupBox)
         self.setLayout(windowLayout)
         self.show()
 
@@ -186,19 +186,20 @@ class PlotDialog(QDialog):
                 curr_id = col_id * num_rows + row_id
                 curr_plot = pg.PlotWidget(title='#' + str(curr_id + 1))
                 curr_plot.enableAutoRange(False, False)
-                curr_plot.setXRange(0, 500)
+                curr_plot.setXRange(0, 3000)
+                curr_plot.setYRange(-2000, 2000)
                 curve = HDF5Plot()
                 curr_data = self.data.stream[:, curr_id]
                 curve.setHDF5(curr_data)
                 curr_plot.addItem(curve)
-                if self.type == 'spike':
-                    spike_times = self.data.spikes[curr_id]
-                    spike_ampls = self.data.spikes_amplitudes[curr_id]
-                    curr_plot.plot(x=spike_times, y=spike_ampls, size=10, pen=pg.mkPen(None), brush='b', symbol='o',
-                                   symbolBrush='w')
-                    # points = HDF5Point()
-                    # points.setHDF5(spike_times, spike_ampls)
-                    # curr_plot.addItem(points)
+                # if self.type == 'spike':
+                #   spike_times = self.data.spikes[curr_id]
+                #   spike_ampls = self.data.spikes_amplitudes[curr_id]
+                #   curr_plot.plot(x=spike_times, y=spike_ampls, size=10, pen=pg.mkPen(None), brush='b', symbol='o',
+                #                   symbolBrush='w')
+                # points = HDF5Point()
+                # points.setHDF5(spike_times, spike_ampls)
+                # curr_plot.addItem(points)
                 layout.addWidget(curr_plot, col_id, row_id)
                 plots.append(curr_plot)
                 if curr_id > 0:
@@ -206,6 +207,61 @@ class PlotDialog(QDialog):
                     plots[curr_id - 1].getViewBox().setYLink(plots[curr_id])
 
         self.horizontalGroupBox.setLayout(layout)
+
+    def createButtonLayout(self):
+        self.buttonGroupBox = QGroupBox()
+        buttonLayout = QHBoxLayout()
+        buttonLayout.addStretch()
+
+        self.signalComboBox = QComboBox()
+        signal_numbers = list(range(1, 61))
+        self.signalComboBox.addItems([str(num) for num in signal_numbers])
+        buttonLayout.addWidget(self.signalComboBox)
+
+        self.prevqbtn = QPushButton('<', self)
+        self.prevqbtn.setEnabled(True)
+        if not self.data.spikes:
+            self.prevqbtn.setEnabled(False)
+        buttonLayout.addWidget(self.prevqbtn)
+        self.prevqbtn.clicked.connect(lambda: self.change_range_backward())
+
+        self.nextqbtn = QPushButton('>', self)
+        self.nextqbtn.setEnabled(True)
+        if not self.data.spikes:
+            self.nextqbtn.setEnabled(False)
+        buttonLayout.addWidget(self.nextqbtn)
+        self.nextqbtn.clicked.connect(lambda: self.change_range_forward())
+
+        buttonLayout.addStretch()
+        self.buttonGroupBox.setLayout(buttonLayout)
+
+    def change_range_forward(self):
+        if getattr(self, 'spike_id', None) is None:
+            self.spike_id = 0
+            curr_signal = int(self.signalComboBox.currentText()) - 1
+            curr_spike = self.data.spikes[curr_signal][self.spike_id]
+        else:
+            curr_signal = int(self.signalComboBox.currentText()) - 1
+            curr_spike = self.data.spikes[curr_signal][self.spike_id]
+            if self.spike_id < len(self.data.spikes[curr_signal]):
+                self.spike_id += 1
+        left_border = max(0, curr_spike - 1500)
+        right_border = min(len(self.data.time), curr_spike + 1500)
+        self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
+
+    def change_range_backward(self):
+        if getattr(self, 'spike_id', None) is None:
+            self.spike_id = 0
+            curr_signal = int(self.signalComboBox.currentText()) - 1
+            curr_spike = self.data.spikes[curr_signal][self.spike_id]
+        else:
+            curr_signal = int(self.signalComboBox.currentText()) - 1
+            curr_spike = self.data.spikes[curr_signal][self.spike_id]
+            if self.spike_id > 0:
+                self.spike_id -= 1
+        left_border = max(0, curr_spike - 1500)
+        right_border = min(len(self.data.time), curr_spike + 1500)
+        self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
 
 
 def main(args=sys.argv):

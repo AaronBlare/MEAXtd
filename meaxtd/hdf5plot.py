@@ -1,7 +1,5 @@
 import pyqtgraph as pg
 import numpy as np
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPen
 
 
 class HDF5Plot(pg.PlotCurveItem):
@@ -66,16 +64,16 @@ class HDF5Plot(pg.PlotCurveItem):
         self.scale(scale, 1)
 
 
-class HDF5Point(pg.ScatterPlotItem):
+class HDF5Point(pg.PlotCurveItem):
     def __init__(self, *args, **kwds):
         self.x = None
         self.y = None
         self.limit = 10000
-        pg.ScatterPlotItem.__init__(self, *args, **kwds)
+        pg.PlotCurveItem.__init__(self, *args, **kwds)
 
-    def setHDF5(self, x, y):
-        self.x = x
-        self.y = y
+    def setHDF5(self, time, signal):
+        self.x = time
+        self.y = signal
         self.updateHDF5Plot()
 
     def viewRangeChanged(self):
@@ -109,12 +107,10 @@ class HDF5Point(pg.ScatterPlotItem):
 
             chunkSize = (1000000 // ds) * ds
             while sourcePtr < stop - 1:
-                xchunk = [self.x[i] for i in range(0, len(self.x)) if
-                          self.x[i] >= sourcePtr and self.x[i] < min(stop, sourcePtr + chunkSize)]
-                ychunk = [self.y[i] for i in range(0, len(self.y)) if
-                          self.y[i] >= sourcePtr and self.y[i] < min(stop, sourcePtr + chunkSize)]
+                xchunk = self.x[sourcePtr:min(stop, sourcePtr + chunkSize)]
+                ychunk = self.y[sourcePtr:min(stop, sourcePtr + chunkSize)]
 
-                sourcePtr += min(stop, sourcePtr + chunkSize) - sourcePtr + 1
+                sourcePtr += len(xchunk)
 
                 xchunk = xchunk[:(len(xchunk) // ds) * ds].reshape(len(xchunk) // ds, ds)
                 ychunk = ychunk[:(len(ychunk) // ds) * ds].reshape(len(ychunk) // ds, ds)
@@ -135,7 +131,7 @@ class HDF5Point(pg.ScatterPlotItem):
             yvisible = yvisible[:targetPtr]
             scale = ds * 0.5
 
-        self.setData(x=self.x, y=self.y, size=10, pen=pg.mkPen(None), brush='b', symbol='o', symbolBrush='w')
+        self.setData(xvisible, yvisible)
         self.setPos(start, 0)
         self.resetTransform()
         self.scale(scale, 1)
