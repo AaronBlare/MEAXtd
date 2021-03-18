@@ -9,13 +9,27 @@ def find_spikes(data):
     for signal_id in range(0, num_signals):
         peaks, properties = find_peaks(signals[:, signal_id], height=0)
         curr_std_val = np.std(signals[:, signal_id])
-        curr_rms_val = np.sqrt(np.mean(signals[:, signal_id]**2))
+        curr_rms_val = np.sqrt(np.mean(signals[:, signal_id] ** 2))
         spikes = []
+        spike_start = []
+        spike_end = []
         for peak_id in range(0, len(peaks)):
             if properties['peak_heights'][peak_id] > 5.0 * curr_rms_val:
-                spikes.append(peaks[peak_id])
-        data.spikes[signal_id] = np.asarray(spikes)
-        data.spikes_amplitudes[signal_id] = np.take(signals[:, signal_id], spikes)
+                curr_spike = peaks[peak_id]
+                spikes.append(curr_spike)
+                curr_id = curr_spike
+                while signals[:, signal_id][curr_id - 1] < signals[:, signal_id][curr_id] and curr_id > 0:
+                    curr_id -= 1
+                spike_start.append(curr_id)
+                curr_id = curr_spike
+                while signals[:, signal_id][curr_id + 1] < signals[:, signal_id][curr_id] and curr_id + 1 < len(
+                        signals[:, signal_id]) - 1:
+                    curr_id += 1
+                spike_end.append(curr_id)
+                data.spikes[signal_id] = np.asarray(spikes)
+                data.spikes_amplitudes[signal_id] = np.take(signals[:, signal_id], spikes)
+                data.spikes_starts[signal_id] = np.asarray(spike_start)
+                data.spikes_ends[signal_id] = np.asarray(spike_end)
 
 
 def find_bursts(data):

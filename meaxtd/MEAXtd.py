@@ -116,7 +116,7 @@ class MEAXtd(QMainWindow):
     def find_spikes(self):
         if not self.data.spikes:
             find_spikes(self.data)
-        self.plot = PlotDialog(self.data)
+        self.plot = PlotDialog(self.data, type='spike')
         self.plot.show()
 
 
@@ -154,9 +154,10 @@ class AboutDialog(QDialog):
 
 class PlotDialog(QDialog):
 
-    def __init__(self, data):
+    def __init__(self, data, type=None):
         super().__init__()
         self.data = data
+        self.type = type
         self.initUI()
 
     def initUI(self):
@@ -193,10 +194,10 @@ class PlotDialog(QDialog):
                 curve.setHDF5(curr_data)
                 curr_plot.addItem(curve)
                 # if self.type == 'spike':
-                #   spike_times = self.data.spikes[curr_id]
-                #   spike_ampls = self.data.spikes_amplitudes[curr_id]
-                #   curr_plot.plot(x=spike_times, y=spike_ampls, size=10, pen=pg.mkPen(None), brush='b', symbol='o',
-                #                   symbolBrush='w')
+                #     spike_times = self.data.spikes[curr_id]
+                #     spike_ampls = self.data.spikes_amplitudes[curr_id]
+                #     curr_plot.plot(x=spike_times, y=spike_ampls, size=10, pen=pg.mkPen(None), brush='b', symbol='o',
+                #                    symbolBrush='w')
                 # points = HDF5Point()
                 # points.setHDF5(spike_times, spike_ampls)
                 # curr_plot.addItem(points)
@@ -248,6 +249,12 @@ class PlotDialog(QDialog):
         left_border = max(0, curr_spike - 1500)
         right_border = min(len(self.data.time), curr_spike + 1500)
         self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
+        curr_spike_start = self.data.spikes_starts[curr_signal][self.spike_id]
+        curr_spike_end = self.data.spikes_ends[curr_signal][self.spike_id]
+        curr_spike_x = list(range(curr_spike_start, curr_spike_end))
+        curr_spike_y = self.data.stream[:, curr_signal][curr_spike_start:curr_spike_end]
+        self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().plot(x=curr_spike_x, y=curr_spike_y,
+                                                                            pen=pg.mkPen(color='r', width=2))
 
     def change_range_backward(self):
         if getattr(self, 'spike_id', None) is None:
