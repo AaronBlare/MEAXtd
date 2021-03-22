@@ -25,11 +25,17 @@ def find_spikes(data):
                 while signals[:, signal_id][curr_id + 1] < signals[:, signal_id][curr_id] and curr_id + 1 < len(
                         signals[:, signal_id]) - 1:
                     curr_id += 1
-                spike_end.append(curr_id)
-                data.spikes[signal_id] = np.asarray(spikes)
-                data.spikes_amplitudes[signal_id] = np.take(signals[:, signal_id], spikes)
-                data.spikes_starts[signal_id] = np.asarray(spike_start)
-                data.spikes_ends[signal_id] = np.asarray(spike_end)
+                spike_end.append(curr_id + 1)
+        data.spikes[signal_id] = np.asarray(spikes)
+        data.spikes_amplitudes[signal_id] = np.take(signals[:, signal_id], spikes)
+        data.spikes_starts[signal_id] = np.asarray(spike_start)
+        data.spikes_ends[signal_id] = np.asarray(spike_end)
+
+        data.spike_stream[signal_id] = np.empty(len(signals[:, signal_id]))
+        data.spike_stream[signal_id][:] = np.nan
+        for peak_id in range(0, len(spikes)):
+            for curr_id in range(spike_start[peak_id], spike_end[peak_id] + 1):
+                data.spike_stream[signal_id][curr_id] = signals[curr_id, signal_id]
 
 
 def find_bursts(data):

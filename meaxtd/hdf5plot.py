@@ -5,11 +5,13 @@ import numpy as np
 class HDF5Plot(pg.PlotCurveItem):
     def __init__(self, *args, **kwds):
         self.hdf5 = None
+        self.pen = pg.mkPen()
         self.limit = 10000
         pg.PlotCurveItem.__init__(self, *args, **kwds)
 
-    def setHDF5(self, data):
+    def setHDF5(self, data, pen=pg.mkPen()):
         self.hdf5 = data
+        self.pen = pen
         self.updateHDF5Plot()
 
     def viewRangeChanged(self):
@@ -58,7 +60,7 @@ class HDF5Plot(pg.PlotCurveItem):
             visible = visible[:targetPtr]
             scale = ds * 0.5
 
-        self.setData(visible)
+        self.setData(visible, pen=self.pen, connect="finite")
         self.setPos(start, 0)
         self.resetTransform()
         self.scale(scale, 1)

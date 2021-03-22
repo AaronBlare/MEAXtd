@@ -9,4 +9,5 @@ class Data:
         self.spikes_amplitudes = {}
         self.spikes_starts = {}
         self.spikes_ends = {}
+        self.spike_stream = {}
         self.bursts = {}

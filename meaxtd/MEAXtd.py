@@ -193,14 +193,11 @@ class PlotDialog(QDialog):
                 curr_data = self.data.stream[:, curr_id]
                 curve.setHDF5(curr_data)
                 curr_plot.addItem(curve)
-                # if self.type == 'spike':
-                #     spike_times = self.data.spikes[curr_id]
-                #     spike_ampls = self.data.spikes_amplitudes[curr_id]
-                #     curr_plot.plot(x=spike_times, y=spike_ampls, size=10, pen=pg.mkPen(None), brush='b', symbol='o',
-                #                    symbolBrush='w')
-                # points = HDF5Point()
-                # points.setHDF5(spike_times, spike_ampls)
-                # curr_plot.addItem(points)
+                if self.type == 'spike':
+                    spikes = HDF5Plot()
+                    curr_spike_data = self.data.spike_stream[curr_id]
+                    spikes.setHDF5(curr_spike_data, pen=pg.mkPen(color='r', width=2))
+                    curr_plot.addItem(spikes)
                 layout.addWidget(curr_plot, col_id, row_id)
                 plots.append(curr_plot)
                 if curr_id > 0:
@@ -249,12 +246,6 @@ class PlotDialog(QDialog):
         left_border = max(0, curr_spike - 1500)
         right_border = min(len(self.data.time), curr_spike + 1500)
         self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
-        curr_spike_start = self.data.spikes_starts[curr_signal][self.spike_id]
-        curr_spike_end = self.data.spikes_ends[curr_signal][self.spike_id]
-        curr_spike_x = list(range(curr_spike_start, curr_spike_end))
-        curr_spike_y = self.data.stream[:, curr_signal][curr_spike_start:curr_spike_end]
-        self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().plot(x=curr_spike_x, y=curr_spike_y,
-                                                                            pen=pg.mkPen(color='r', width=2))
 
     def change_range_backward(self):
         if getattr(self, 'spike_id', None) is None:
