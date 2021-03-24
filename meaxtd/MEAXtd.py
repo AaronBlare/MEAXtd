@@ -2,13 +2,13 @@ import sys
 import pkg_resources
 import pyqtgraph as pg
 from meaxtd.read_h5 import read_h5_file
-from meaxtd.hdf5plot import HDF5Plot, HDF5Point
-from meaxtd.find_bursts import find_spikes, find_bursts
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import (QAction, QApplication, QDesktopWidget, QDialog, QFileDialog,
-                             QHBoxLayout, QLabel, QMainWindow, QToolBar, QVBoxLayout, QWidget,
-                             QGroupBox, QGridLayout, QPushButton, QComboBox)
+from meaxtd.hdf5plot import HDF5Plot
+from meaxtd.find_bursts import find_spikes, find_burstlets
+from PySide2.QtCore import Qt
+from PySide2.QtGui import QIcon
+from PySide2.QtWidgets import (QAction, QApplication, QDesktopWidget, QDialog, QFileDialog,
+                               QHBoxLayout, QLabel, QMainWindow, QToolBar, QVBoxLayout, QWidget,
+                               QGroupBox, QGridLayout, QPushButton, QComboBox, QRadioButton)
 
 
 class MEAXtd(QMainWindow):
@@ -81,7 +81,7 @@ class MEAXtd(QMainWindow):
         hbox = QHBoxLayout()
         self.plotqbtn = QPushButton('Plot Signals', self)
         self.plotqbtn.setEnabled(False)
-        self.plotqbtn.resize(200, 100)
+        self.plotqbtn.resize(100, 50)
         self.plotqbtn.move(100, 100)
         hbox.addWidget(self.plotqbtn)
         hbox.addStretch(1)
@@ -90,14 +90,14 @@ class MEAXtd(QMainWindow):
 
     def spike_button(self):
         hbox = QHBoxLayout()
-        self.spikeqbtn = QPushButton('Find Spikes', self)
+        self.spikeqbtn = QPushButton('Find Bursts', self)
         self.spikeqbtn.setEnabled(False)
-        self.spikeqbtn.resize(200, 100)
-        self.spikeqbtn.move(100, 400)
+        self.spikeqbtn.resize(100, 50)
+        self.spikeqbtn.move(100, 250)
         hbox.addWidget(self.spikeqbtn)
         hbox.addStretch(1)
         self.setLayout(hbox)
-        self.spikeqbtn.clicked.connect(lambda: self.find_spikes())
+        self.spikeqbtn.clicked.connect(lambda: self.find_burstlets())
 
     def open_file(self):
         """Open a QFileDialog to allow the user to open a file into the application."""
@@ -105,7 +105,6 @@ class MEAXtd(QMainWindow):
 
         if accepted:
             self.data = read_h5_file(filename)
-            # find_bursts(self.data)
             self.plotqbtn.setEnabled(True)
             self.spikeqbtn.setEnabled(True)
 
@@ -113,10 +112,10 @@ class MEAXtd(QMainWindow):
         self.plot = PlotDialog(self.data)
         self.plot.show()
 
-    def find_spikes(self):
-        if not self.data.spikes:
-            find_spikes(self.data)
-        self.plot = PlotDialog(self.data, type='spike')
+    def find_burstlets(self):
+        if not self.data.burstlets:
+            find_burstlets(self.data)
+        self.plot = PlotDialog(self.data)
         self.plot.show()
 
 
@@ -154,10 +153,9 @@ class AboutDialog(QDialog):
 
 class PlotDialog(QDialog):
 
-    def __init__(self, data, type=None):
+    def __init__(self, data):
         super().__init__()
         self.data = data
-        self.type = type
         self.initUI()
 
     def initUI(self):
@@ -193,11 +191,6 @@ class PlotDialog(QDialog):
                 curr_data = self.data.stream[:, curr_id]
                 curve.setHDF5(curr_data)
                 curr_plot.addItem(curve)
-                if self.type == 'spike':
-                    spikes = HDF5Plot()
-                    curr_spike_data = self.data.spike_stream[curr_id]
-                    spikes.setHDF5(curr_spike_data, pen=pg.mkPen(color='r', width=2))
-                    curr_plot.addItem(spikes)
                 layout.addWidget(curr_plot, col_id, row_id)
                 plots.append(curr_plot)
                 if curr_id > 0:
@@ -210,6 +203,18 @@ class PlotDialog(QDialog):
         self.buttonGroupBox = QGroupBox()
         buttonLayout = QHBoxLayout()
         buttonLayout.addStretch()
+
+        self.signalrbtn = QRadioButton('Signal')
+        self.signalrbtn.toggled.connect(lambda: self.remove_spike_data())
+        buttonLayout.addWidget(self.signalrbtn)
+
+        self.spikerbtn = QRadioButton('Spike')
+        self.spikerbtn.toggled.connect(lambda: self.add_spike_data())
+        buttonLayout.addWidget(self.spikerbtn)
+
+        self.burstletrbtn = QRadioButton('Burstlet')
+        self.burstletrbtn.toggled.connect(lambda: self.createGridLayout())
+        buttonLayout.addWidget(self.burstletrbtn)
 
         self.signalComboBox = QComboBox()
         signal_numbers = list(range(1, 61))
@@ -232,6 +237,29 @@ class PlotDialog(QDialog):
 
         buttonLayout.addStretch()
         self.buttonGroupBox.setLayout(buttonLayout)
+
+    def remove_spike_data(self):
+        if self.signalrbtn.isChecked():
+            if len(self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().plotItem.curves) > 1:
+                num_rows = 12
+                num_columns = 5
+                for col_id in range(0, num_columns):
+                    for row_id in range(0, num_rows):
+                        curr_plot_item = self.horizontalGroupBox.layout().itemAtPosition(col_id,
+                                                                                         row_id).widget().plotItem
+                        curr_plot_item.removeItem(curr_plot_item.curves[1])
+
+    def add_spike_data(self):
+        if self.spikerbtn.isChecked():
+            num_rows = 12
+            num_columns = 5
+            for col_id in range(0, num_columns):
+                for row_id in range(0, num_rows):
+                    curr_id = col_id * num_rows + row_id
+                    spikes = HDF5Plot()
+                    curr_spike_data = self.data.spike_stream[curr_id]
+                    spikes.setHDF5(curr_spike_data, pen=pg.mkPen(color='r', width=2))
+                    self.horizontalGroupBox.layout().itemAtPosition(col_id, row_id).widget().addItem(spikes)
 
     def change_range_forward(self):
         if getattr(self, 'spike_id', None) is None:

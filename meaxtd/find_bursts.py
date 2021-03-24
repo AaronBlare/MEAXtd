@@ -4,7 +4,6 @@ import numpy as np
 
 def find_spikes(data):
     signals = data.stream
-    time = data.time
     num_signals = signals.shape[1]
     for signal_id in range(0, num_signals):
         peaks, properties = find_peaks(signals[:, signal_id], height=0)
@@ -27,7 +26,6 @@ def find_spikes(data):
                     curr_id += 1
                 spike_end.append(curr_id + 1)
         data.spikes[signal_id] = np.asarray(spikes)
-        data.spikes_amplitudes[signal_id] = np.take(signals[:, signal_id], spikes)
         data.spikes_starts[signal_id] = np.asarray(spike_start)
         data.spikes_ends[signal_id] = np.asarray(spike_end)
 
@@ -38,23 +36,36 @@ def find_spikes(data):
                 data.spike_stream[signal_id][curr_id] = signals[curr_id, signal_id]
 
 
-def find_bursts(data):
+def find_burstlets(data):
     if not data.spikes:
         find_spikes(data)
     signals = data.stream
-    time = data.time
     spikes = data.spikes
     num_signals = signals.shape[1]
     window = 100 * 10  # 100 ms
     for signal_id in range(0, num_signals):
-        data.bursts[signal_id] = []
+        data.burstlets[signal_id] = []
         num_spikes = len(spikes[signal_id])
-        curr_burst = []
+        curr_burstlet = []
+        burstlet_start = []
+        burstlet_end = []
         for spike_id in range(0, num_spikes - 1):
             if spikes[signal_id][spike_id + 1] - spikes[signal_id][spike_id] < window:
-                curr_burst.append(spikes[signal_id][spike_id])
+                curr_burstlet.append(spikes[signal_id][spike_id])
             else:
-                if len(curr_burst) >= 5:
-                    curr_burst.append(spikes[signal_id][spike_id])
-                    data.bursts[signal_id].append(curr_burst)
-                curr_burst = []
+                if len(curr_burstlet) >= 5:
+                    curr_burstlet.append(spikes[signal_id][spike_id])
+                    data.burstlets[signal_id].append(curr_burstlet)
+                    curr_start_id = np.where(spikes[signal_id] == curr_burstlet[0])[0][0]
+                    curr_end_id = np.where(spikes[signal_id] == curr_burstlet[-1])[0][0]
+                    burstlet_start.append(data.spikes_starts[signal_id][curr_start_id])
+                    burstlet_end.append(data.spikes_ends[signal_id][curr_end_id])
+                curr_burstlet = []
+        data.burstlets_starts[signal_id] = np.asarray(burstlet_start)
+        data.burstlets_ends[signal_id] = np.asarray(burstlet_end)
+
+        data.burstlet_stream[signal_id] = np.empty(len(signals[:, signal_id]))
+        data.burstlet_stream[signal_id][:] = np.nan
+        for peak_id in range(0, len(data.burstlets[signal_id])):
+            for curr_id in range(burstlet_start[peak_id], burstlet_end[peak_id] + 1):
+                data.burstlet_stream[signal_id][curr_id] = signals[curr_id, signal_id]
