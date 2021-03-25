@@ -6,10 +6,12 @@ class Data:
         self.stream = np.empty(shape=(1, 1))
         self.time = np.empty(shape=(1, 1))
         self.spikes = {}
+        self.spikes_amplitudes = {}
         self.spikes_starts = {}
         self.spikes_ends = {}
         self.spike_stream = {}
         self.burstlets = {}
+        self.burstlets_amplitudes = {}
         self.burstlets_starts = {}
         self.burstlets_ends = {}
         self.burstlet_stream = {}
