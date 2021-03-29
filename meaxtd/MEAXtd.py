@@ -7,7 +7,7 @@ from meaxtd.find_bursts import find_spikes, find_burstlets
 from PySide2.QtCore import Qt
 from PySide2.QtGui import QIcon
 from PySide2.QtWidgets import (QAction, QApplication, QDesktopWidget, QDialog, QFileDialog,
-                               QHBoxLayout, QLabel, QMainWindow, QToolBar, QVBoxLayout, QWidget,
+                               QHBoxLayout, QLabel, QMainWindow, QToolBar, QVBoxLayout, QWidget, QTabWidget,
                                QGroupBox, QGridLayout, QPushButton, QComboBox, QRadioButton)
 
 
@@ -17,27 +17,39 @@ class MEAXtd(QMainWindow):
     def __init__(self, parent=None):
         """Initialize the components of the main window."""
         super(MEAXtd, self).__init__(parent)
-        self.resize(1024, 768)
         self.setWindowTitle('MEAXtd')
         window_icon = pkg_resources.resource_filename('meaxtd.images',
                                                       'ic_insert_drive_file_black_48dp_1x.png')
         self.setWindowIcon(QIcon(window_icon))
-
-        self.widget = QWidget()
-        self.layout = QHBoxLayout(self.widget)
+        self.resize(2000, 900)
 
         self.menu_bar = self.menuBar()
         self.about_dialog = AboutDialog()
-
         self.status_bar = self.statusBar()
         self.status_bar.showMessage('Ready', 5000)
-
         self.file_menu()
         self.help_menu()
-        self.plot_button()
-        self.spike_button()
 
+        self.tabs = QTabWidget(self)
+        self.main_tab = QWidget()
+
+        self.main_tab.layout = QHBoxLayout(self)
+        self.plot_button(self.main_tab.layout)
+        self.spike_button(self.main_tab.layout)
         self.tool_bar_items()
+        self.main_tab.setLayout(self.main_tab.layout)
+
+        self.plot_tab = QWidget()
+        self.plot = PlotDialog()
+        self.plot_tab.layout = QVBoxLayout(self)
+        self.plot_tab.layout.addWidget(self.plot.horizontalGroupBox)
+        self.plot_tab.layout.addWidget(self.plot.buttonGroupBox)
+        self.plot_tab.setLayout(self.plot_tab.layout)
+
+        self.tabs.addTab(self.main_tab, "Main")
+        self.tabs.addTab(self.plot_tab, "Plot")
+
+        self.setCentralWidget(self.tabs)
 
     def file_menu(self):
         """Create a file submenu with an Open File item that opens a file dialog."""
@@ -77,28 +89,6 @@ class MEAXtd(QMainWindow):
         # tool_bar_open_action.triggered.connect(self.open_file)
         # self.tool_bar.addAction(tool_bar_open_action)
 
-    def plot_button(self):
-        hbox = QHBoxLayout()
-        self.plotqbtn = QPushButton('Plot Signals', self)
-        self.plotqbtn.setEnabled(False)
-        self.plotqbtn.resize(100, 50)
-        self.plotqbtn.move(100, 100)
-        hbox.addWidget(self.plotqbtn)
-        hbox.addStretch(1)
-        self.setLayout(hbox)
-        self.plotqbtn.clicked.connect(lambda: self.plot_data())
-
-    def spike_button(self):
-        hbox = QHBoxLayout()
-        self.spikeqbtn = QPushButton('Find Bursts', self)
-        self.spikeqbtn.setEnabled(False)
-        self.spikeqbtn.resize(100, 50)
-        self.spikeqbtn.move(100, 250)
-        hbox.addWidget(self.spikeqbtn)
-        hbox.addStretch(1)
-        self.setLayout(hbox)
-        self.spikeqbtn.clicked.connect(lambda: self.find_burstlets())
-
     def open_file(self):
         """Open a QFileDialog to allow the user to open a file into the application."""
         filename, accepted = QFileDialog.getOpenFileName(self, 'Open File', filter="*.h5")
@@ -107,6 +97,26 @@ class MEAXtd(QMainWindow):
             self.data = read_h5_file(filename)
             self.plotqbtn.setEnabled(True)
             self.spikeqbtn.setEnabled(True)
+
+    def plot_button(self, layout):
+        self.plotqbtn = QPushButton('Plot Signals', self)
+        self.plotqbtn.setEnabled(False)
+        self.plotqbtn.resize(100, 50)
+        self.plotqbtn.move(100, 100)
+        layout.addWidget(self.plotqbtn)
+        layout.addStretch(1)
+        self.setLayout(layout)
+        self.plotqbtn.clicked.connect(lambda: self.plot_data())
+
+    def spike_button(self, layout):
+        self.spikeqbtn = QPushButton('Find Bursts', self)
+        self.spikeqbtn.setEnabled(False)
+        self.spikeqbtn.resize(100, 50)
+        self.spikeqbtn.move(100, 250)
+        layout.addWidget(self.spikeqbtn)
+        layout.addStretch(1)
+        self.setLayout(layout)
+        self.spikeqbtn.clicked.connect(lambda: self.find_burstlets())
 
     def plot_data(self):
         self.plot = PlotDialog(self.data)
@@ -153,7 +163,7 @@ class AboutDialog(QDialog):
 
 class PlotDialog(QDialog):
 
-    def __init__(self, data):
+    def __init__(self, data=None):
         super().__init__()
         self.data = data
         self.initUI()
@@ -161,12 +171,6 @@ class PlotDialog(QDialog):
     def initUI(self):
         self.createGridLayout()
         self.createButtonLayout()
-        self.resize(2000, 900)
-        windowLayout = QVBoxLayout()
-        windowLayout.addWidget(self.horizontalGroupBox)
-        windowLayout.addWidget(self.buttonGroupBox)
-        self.setLayout(windowLayout)
-        self.show()
 
     def createGridLayout(self):
         self.horizontalGroupBox = QGroupBox()
@@ -187,10 +191,11 @@ class PlotDialog(QDialog):
                 curr_plot.enableAutoRange(False, False)
                 curr_plot.setXRange(0, 3000)
                 curr_plot.setYRange(-2000, 2000)
-                curve = HDF5Plot()
-                curr_data = self.data.stream[:, curr_id]
-                curve.setHDF5(curr_data)
-                curr_plot.addItem(curve)
+                if self.data:
+                    curve = HDF5Plot()
+                    curr_data = self.data.stream[:, curr_id]
+                    curve.setHDF5(curr_data)
+                    curr_plot.addItem(curve)
                 layout.addWidget(curr_plot, col_id, row_id)
                 plots.append(curr_plot)
                 if curr_id > 0:
