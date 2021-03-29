@@ -34,7 +34,6 @@ class MEAXtd(QMainWindow):
         self.main_tab = QWidget()
 
         self.main_tab.layout = QHBoxLayout(self)
-        self.plot_button(self.main_tab.layout)
         self.spike_button(self.main_tab.layout)
         self.tool_bar_items()
         self.main_tab.setLayout(self.main_tab.layout)
@@ -95,18 +94,9 @@ class MEAXtd(QMainWindow):
 
         if accepted:
             self.data = read_h5_file(filename)
-            self.plotqbtn.setEnabled(True)
             self.spikeqbtn.setEnabled(True)
-
-    def plot_button(self, layout):
-        self.plotqbtn = QPushButton('Plot Signals', self)
-        self.plotqbtn.setEnabled(False)
-        self.plotqbtn.resize(100, 50)
-        self.plotqbtn.move(100, 100)
-        layout.addWidget(self.plotqbtn)
-        layout.addStretch(1)
-        self.setLayout(layout)
-        self.plotqbtn.clicked.connect(lambda: self.plot_data())
+            self.plot.set_data(self.data)
+            self.plot.plot_signals()
 
     def spike_button(self, layout):
         self.spikeqbtn = QPushButton('Find Bursts', self)
@@ -118,15 +108,13 @@ class MEAXtd(QMainWindow):
         self.setLayout(layout)
         self.spikeqbtn.clicked.connect(lambda: self.find_burstlets())
 
-    def plot_data(self):
-        self.plot = PlotDialog(self.data)
-        self.plot.show()
-
     def find_burstlets(self):
         if not self.data.burstlets:
             find_burstlets(self.data)
-        self.plot = PlotDialog(self.data)
-        self.plot.show()
+        self.plot.signalrbtn.setCheckable(True)
+        self.plot.signalrbtn.setChecked(True)
+        self.plot.spikerbtn.setCheckable(True)
+        self.plot.burstletrbtn.setCheckable(True)
 
 
 class AboutDialog(QDialog):
@@ -167,6 +155,9 @@ class PlotDialog(QDialog):
         super().__init__()
         self.data = data
         self.initUI()
+
+    def set_data(self, data):
+        self.data = data
 
     def initUI(self):
         self.createGridLayout()
@@ -222,6 +213,11 @@ class PlotDialog(QDialog):
         self.burstletrbtn.toggled.connect(lambda: self.add_burstlet_data())
         buttonLayout.addWidget(self.burstletrbtn)
 
+        if not self.data:
+            self.signalrbtn.setCheckable(False)
+            self.spikerbtn.setCheckable(False)
+            self.burstletrbtn.setCheckable(False)
+
         self.signalComboBox = QComboBox()
         signal_numbers = list(range(1, 61))
         self.signalComboBox.addItems([str(num) for num in signal_numbers])
@@ -243,6 +239,17 @@ class PlotDialog(QDialog):
 
         buttonLayout.addStretch()
         self.buttonGroupBox.setLayout(buttonLayout)
+
+    def plot_signals(self):
+        num_rows = 12
+        num_columns = 5
+        for col_id in range(0, num_columns):
+            for row_id in range(0, num_rows):
+                curr_id = col_id * num_rows + row_id
+                curve = HDF5Plot()
+                curr_data = self.data.stream[:, curr_id]
+                curve.setHDF5(curr_data)
+                self.horizontalGroupBox.layout().itemAtPosition(col_id, row_id).widget().addItem(curve)
 
     def remove_data(self):
         if self.signalrbtn.isChecked():
