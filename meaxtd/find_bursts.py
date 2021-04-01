@@ -7,14 +7,15 @@ def find_spikes(data):
     num_signals = signals.shape[1]
     for signal_id in range(0, num_signals):
         peaks, properties = find_peaks(signals[:, signal_id], height=0)
-        curr_std_val = np.std(signals[:, signal_id])
-        curr_rms_val = np.sqrt(np.mean(signals[:, signal_id] ** 2))
+        noise_std = np.std(signals[:, signal_id])
+        noise_rms = np.sqrt(np.mean(signals[:, signal_id] ** 2))
+        noise_mad = np.median(np.absolute(signals[:, signal_id])) / 0.6745
         spikes = []
         spike_amplitude = []
         spike_start = []
         spike_end = []
         for peak_id in range(0, len(peaks)):
-            if properties['peak_heights'][peak_id] > 5.0 * curr_rms_val:
+            if properties['peak_heights'][peak_id] > 5.0 * noise_mad:
                 curr_spike = peaks[peak_id]
                 spikes.append(curr_spike)
                 curr_id = curr_spike

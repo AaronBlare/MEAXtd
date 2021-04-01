@@ -2,7 +2,7 @@ import sys
 import pkg_resources
 import pyqtgraph as pg
 from meaxtd.read_h5 import read_h5_file
-from meaxtd.hdf5plot import HDF5Plot
+from meaxtd.hdf5plot import HDF5Plot, HDF5PlotXY
 from meaxtd.find_bursts import find_spikes, find_burstlets
 from PySide2.QtCore import Qt
 from PySide2.QtGui import QIcon
@@ -180,12 +180,15 @@ class PlotDialog(QDialog):
                 curr_id = col_id * num_rows + row_id
                 curr_plot = pg.PlotWidget(title='#' + str(curr_id + 1))
                 curr_plot.enableAutoRange(False, False)
-                curr_plot.setXRange(0, 3000)
-                curr_plot.setYRange(-2000, 2000)
+                curr_plot.setXRange(0, 1)
+                curr_plot.setYRange(-0.002, 0.002)
+                curr_plot.setLabel('left', 'Voltage (μV)')
+                curr_plot.setLabel('bottom', 'Time (s)')
                 if self.data:
-                    curve = HDF5Plot()
+                    curve = HDF5PlotXY()
                     curr_data = self.data.stream[:, curr_id]
-                    curve.setHDF5(curr_data)
+                    curr_time = self.data.time
+                    curve.setHDF5(curr_time, curr_data, self.data.fs)
                     curr_plot.addItem(curve)
                 layout.addWidget(curr_plot, col_id, row_id)
                 plots.append(curr_plot)
@@ -246,9 +249,9 @@ class PlotDialog(QDialog):
         for col_id in range(0, num_columns):
             for row_id in range(0, num_rows):
                 curr_id = col_id * num_rows + row_id
-                curve = HDF5Plot()
+                curve = HDF5PlotXY()
                 curr_data = self.data.stream[:, curr_id]
-                curve.setHDF5(curr_data)
+                curve.setHDF5(self.data.time, curr_data, self.data.fs)
                 self.horizontalGroupBox.layout().itemAtPosition(col_id, row_id).widget().addItem(curve)
 
     def remove_data(self):
@@ -281,9 +284,9 @@ class PlotDialog(QDialog):
             for col_id in range(0, num_columns):
                 for row_id in range(0, num_rows):
                     curr_id = col_id * num_rows + row_id
-                    spikes = HDF5Plot()
+                    spikes = HDF5PlotXY()
                     curr_spike_data = self.data.spike_stream[curr_id]
-                    spikes.setHDF5(curr_spike_data, pen=pg.mkPen(color='r', width=2))
+                    spikes.setHDF5(self.data.time, curr_spike_data, self.data.fs, pen=pg.mkPen(color='r', width=2))
                     self.horizontalGroupBox.layout().itemAtPosition(col_id, row_id).widget().addItem(spikes)
 
     def add_burstlet_data(self):
@@ -294,9 +297,10 @@ class PlotDialog(QDialog):
             for col_id in range(0, num_columns):
                 for row_id in range(0, num_rows):
                     curr_id = col_id * num_rows + row_id
-                    burstlets = HDF5Plot()
+                    burstlets = HDF5PlotXY()
                     curr_burstlet_data = self.data.burstlet_stream[curr_id]
-                    burstlets.setHDF5(curr_burstlet_data, pen=pg.mkPen(color='r', width=2))
+                    burstlets.setHDF5(self.data.time, curr_burstlet_data, self.data.fs,
+                                      pen=pg.mkPen(color='r', width=2))
                     self.horizontalGroupBox.layout().itemAtPosition(col_id, row_id).widget().addItem(burstlets)
 
     def change_range_forward(self):
@@ -308,12 +312,12 @@ class PlotDialog(QDialog):
             curr_spike_amplitude = self.data.spikes_amplitudes[curr_signal][self.spike_id]
             if self.spike_id < len(self.data.spikes[curr_signal]):
                 self.spike_id += 1
-            left_border = max(0, curr_spike - 1500)
-            right_border = min(len(self.data.time), curr_spike + 1500)
+            left_border = max(0, self.data.time[curr_spike] - 0.5)
+            right_border = min(len(self.data.time), self.data.time[curr_spike] + 0.5)
             self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
-            if curr_spike_amplitude > 4000:
-                top_border = max(2000, curr_spike_amplitude // 2 + 100)
-                bottom_border = min(-2000, curr_spike_amplitude // 2 - 100)
+            if curr_spike_amplitude > 0.004:
+                top_border = max(0.002, curr_spike_amplitude // 2 + 0.0001)
+                bottom_border = min(-0.002, curr_spike_amplitude // 2 - 0.0001)
                 self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
         if self.burstletrbtn.isChecked():
             if getattr(self, 'burstlet_id', None) is None:
@@ -324,18 +328,18 @@ class PlotDialog(QDialog):
             curr_burstlet_end = self.data.burstlets_ends[curr_signal][self.burstlet_id]
             if self.burstlet_id < len(self.data.burstlets[curr_signal]):
                 self.burstlet_id += 1
-            curr_burstlet_len = curr_burstlet_end - curr_burstlet_start
-            if curr_burstlet_len > 3000:
-                left_border = curr_burstlet_start - 100
-                right_border = curr_burstlet_end + 100
+            curr_burstlet_len = self.data.time[curr_burstlet_end] - self.data.time[curr_burstlet_start]
+            if curr_burstlet_len > 1:
+                left_border = self.data.time[curr_burstlet_start] - 0.1
+                right_border = self.data.time[curr_burstlet_end] + 0.1
             else:
-                left_border = curr_burstlet_start - (3000 - curr_burstlet_len) // 2
-                right_border = curr_burstlet_end + (3000 - curr_burstlet_len) // 2
+                left_border = self.data.time[curr_burstlet_start] - (1 - curr_burstlet_len) // 2
+                right_border = self.data.time[curr_burstlet_end] + (1 - curr_burstlet_len) // 2
             self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
             curr_burstlet_amplitude = self.data.burstlets_amplitudes[curr_signal][self.burstlet_id]
-            if curr_burstlet_amplitude > 4000:
-                top_border = max(2000, curr_burstlet_amplitude // 2 + 100)
-                bottom_border = min(-2000, curr_burstlet_amplitude // 2 - 100)
+            if curr_burstlet_amplitude > 0.004:
+                top_border = max(0.002, curr_burstlet_amplitude // 2 + 0.0001)
+                bottom_border = min(-0.002, curr_burstlet_amplitude // 2 - 0.0001)
                 self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
 
     def change_range_backward(self):
@@ -347,12 +351,12 @@ class PlotDialog(QDialog):
             curr_spike_amplitude = self.data.spikes_amplitudes[curr_signal][self.spike_id]
             if self.spike_id > 0:
                 self.spike_id -= 1
-            left_border = max(0, curr_spike - 1500)
-            right_border = min(len(self.data.time), curr_spike + 1500)
+            left_border = max(0, self.data.time[curr_spike] - 0.5)
+            right_border = min(len(self.data.time), self.data.time[curr_spike] + 0.5)
             self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
-            if curr_spike_amplitude > 4000:
-                top_border = max(2000, curr_spike_amplitude // 2 + 100)
-                bottom_border = min(-2000, curr_spike_amplitude // 2 - 100)
+            if curr_spike_amplitude > 0.004:
+                top_border = max(0.002, curr_spike_amplitude // 2 + 0.0001)
+                bottom_border = min(-0.002, curr_spike_amplitude // 2 - 0.0001)
                 self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
         if self.burstletrbtn.isChecked():
             if getattr(self, 'burstlet_id', None) is None:
@@ -364,17 +368,17 @@ class PlotDialog(QDialog):
             if self.burstlet_id < len(self.data.burstlets[curr_signal]):
                 self.burstlet_id -= 1
             curr_burstlet_len = curr_burstlet_end - curr_burstlet_start
-            if curr_burstlet_len > 3000:
-                left_border = curr_burstlet_start - 100
-                right_border = curr_burstlet_end + 100
+            if curr_burstlet_len > 1:
+                left_border = self.data.time[curr_burstlet_start] - 0.1
+                right_border = self.data.time[curr_burstlet_end] + 0.1
             else:
-                left_border = curr_burstlet_start - (3000 - curr_burstlet_len) // 2
-                right_border = curr_burstlet_end + (3000 - curr_burstlet_len) // 2
+                left_border = self.data.time[curr_burstlet_start] - (1 - curr_burstlet_len) // 2
+                right_border = self.data.time[curr_burstlet_end] + (1 - curr_burstlet_len) // 2
             self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
             curr_burstlet_amplitude = self.data.burstlets_amplitudes[curr_signal][self.burstlet_id]
-            if curr_burstlet_amplitude > 4000:
-                top_border = max(2000, curr_burstlet_amplitude // 2 + 100)
-                bottom_border = min(-2000, curr_burstlet_amplitude // 2 - 100)
+            if curr_burstlet_amplitude > 0.004:
+                top_border = max(0.002, curr_burstlet_amplitude // 2 + 0.0001)
+                bottom_border = min(-0.002, curr_burstlet_amplitude // 2 - 0.0001)
                 self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
 
 
