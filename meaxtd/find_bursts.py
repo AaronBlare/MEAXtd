@@ -1,4 +1,5 @@
 import numpy as np
+from intervaltree import IntervalTree
 
 
 def find_spikes(data):
@@ -110,3 +111,33 @@ def find_burstlets(data):
         for peak_id in range(0, len(data.burstlets[signal_id])):
             for curr_id in range(burstlet_start[peak_id], burstlet_end[peak_id] + 1):
                 data.burstlet_stream[signal_id][curr_id] = signals[curr_id, signal_id]
+
+
+def create_interval_tree(data):
+    tree = IntervalTree()
+    num_signals = data.stream.shape[1]
+    for signal_id in range(0, num_signals):
+        for burstlet_id in range(0, len(data.burstlets[signal_id])):
+            curr_burstlet_start = data.burstlets_starts[signal_id][burstlet_id]
+            curr_burstlet_end = data.burstlets_ends[signal_id][burstlet_id]
+            tree[curr_burstlet_start:curr_burstlet_end] = {'signal_id': signal_id, 'burstlet_id': burstlet_id}
+    return tree
+
+
+def find_bursts(data):
+    if not data.burstlets:
+        find_burstlets(data)
+    signals = data.stream
+    signal_len = len(signals[:, 0])
+    num_signals = signals.shape[1]
+    burst_detection_function = np.empty(signal_len, dtype=int)
+    burst_detection_function[:] = 0
+    for signal_id in range(0, num_signals):
+        for burstlet_id in range(0, len(data.burstlets[signal_id])):
+            curr_burstlet_start = data.burstlets_starts[signal_id][burstlet_id]
+            curr_burstlet_end = data.burstlets_ends[signal_id][burstlet_id]
+            burst_detection_function[curr_burstlet_start:curr_burstlet_end] += 1
+    threshold_crossings = np.diff(burst_detection_function > 5, prepend=False)
+    threshold_crossings_ids = np.argwhere(threshold_crossings)[:, 0]
+    interval_tree = create_interval_tree(data)
+

@@ -15,3 +15,4 @@ class Data:
         self.burstlets_ends = {}
         self.burstlets_amplitudes = {}
         self.burstlet_stream = {}
+        self.bursts = {}

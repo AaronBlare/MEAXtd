@@ -13,3 +13,4 @@ pandas==1.2.3
 setuptools==47.1.0
 h5py==3.2.1
 scipy==1.6.1
+intervaltree==3.1.0

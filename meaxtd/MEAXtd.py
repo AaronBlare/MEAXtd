@@ -3,7 +3,7 @@ import pkg_resources
 import pyqtgraph as pg
 from meaxtd.read_h5 import read_h5_file
 from meaxtd.hdf5plot import HDF5Plot, HDF5PlotXY
-from meaxtd.find_bursts import find_spikes, find_burstlets
+from meaxtd.find_bursts import find_spikes, find_burstlets, find_bursts
 from PySide2.QtCore import Qt
 from PySide2.QtGui import QIcon
 from PySide2.QtWidgets import (QAction, QApplication, QDesktopWidget, QDialog, QFileDialog,
@@ -35,6 +35,7 @@ class MEAXtd(QMainWindow):
 
         self.main_tab.layout = QHBoxLayout(self)
         self.spike_button(self.main_tab.layout)
+        self.burst_button(self.main_tab.layout)
         self.tool_bar_items()
         self.main_tab.setLayout(self.main_tab.layout)
 
@@ -99,10 +100,9 @@ class MEAXtd(QMainWindow):
             self.plot.plot_signals()
 
     def spike_button(self, layout):
-        self.spikeqbtn = QPushButton('Find Bursts', self)
+        self.spikeqbtn = QPushButton('Find Spikes', self)
         self.spikeqbtn.setEnabled(False)
         self.spikeqbtn.resize(100, 50)
-        self.spikeqbtn.move(100, 250)
         layout.addWidget(self.spikeqbtn)
         layout.addStretch(1)
         self.setLayout(layout)
@@ -111,6 +111,24 @@ class MEAXtd(QMainWindow):
     def find_burstlets(self):
         if not self.data.burstlets:
             find_burstlets(self.data)
+        self.plot.signalrbtn.setCheckable(True)
+        self.plot.signalrbtn.setChecked(True)
+        self.plot.spikerbtn.setCheckable(True)
+        self.plot.burstletrbtn.setCheckable(True)
+        self.burstqbtn.setEnabled(True)
+
+    def burst_button(self, layout):
+        self.burstqbtn = QPushButton('Find Bursts', self)
+        self.burstqbtn.setEnabled(False)
+        self.burstqbtn.resize(100, 50)
+        layout.addWidget(self.burstqbtn)
+        layout.addStretch(1)
+        self.setLayout(layout)
+        self.burstqbtn.clicked.connect(lambda: self.find_bursts())
+
+    def find_bursts(self):
+        if not self.data.bursts:
+            find_bursts(self.data)
         self.plot.signalrbtn.setCheckable(True)
         self.plot.signalrbtn.setChecked(True)
         self.plot.spikerbtn.setCheckable(True)
