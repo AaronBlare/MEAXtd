@@ -1,4 +1,3 @@
-from scipy.signal import find_peaks
 import numpy as np
 
 
@@ -6,40 +5,72 @@ def find_spikes(data):
     signals = data.stream
     num_signals = signals.shape[1]
     for signal_id in range(0, num_signals):
-        peaks, properties = find_peaks(signals[:, signal_id], height=0)
         noise_std = np.std(signals[:, signal_id])
         noise_rms = np.sqrt(np.mean(signals[:, signal_id] ** 2))
         noise_mad = np.median(np.absolute(signals[:, signal_id])) / 0.6745
-        spikes = []
-        spike_amplitude = []
-        spike_start = []
-        spike_end = []
-        for peak_id in range(0, len(peaks)):
-            if properties['peak_heights'][peak_id] > 5.0 * noise_mad:
-                curr_spike = peaks[peak_id]
-                spikes.append(curr_spike)
-                curr_id = curr_spike
-                while signals[:, signal_id][curr_id - 1] < signals[:, signal_id][curr_id] and curr_id > 0:
-                    curr_id -= 1
-                spike_start.append(curr_id)
-                curr_id = curr_spike
-                while signals[:, signal_id][curr_id + 1] < signals[:, signal_id][curr_id] and curr_id + 1 < len(
-                        signals[:, signal_id]) - 1:
-                    curr_id += 1
-                spike_end.append(curr_id + 1)
-                curr_spike_amplitude = max(signals[:, signal_id][spike_start[-1]:spike_end[-1]]) - min(
-                    signals[:, signal_id][spike_start[-1]:spike_end[-1]])
-                spike_amplitude.append(curr_spike_amplitude)
+
+        crossings = detect_threshold_crossings(signals[:, signal_id], data.fs, -5.0 * noise_mad, 0.003)
+        spikes = get_spike_peaks(signals[:, signal_id], data.fs, crossings, 0.002)
+        spikes_ends, spikes_maxima = get_spike_ends(signals[:, signal_id], data.fs, crossings, 0.002)
+        spikes_amplitudes = [signals[:, signal_id][spikes_maxima[spike_id]] - signals[:, signal_id][spikes[spike_id]]
+                             for spike_id in range(0, len(spikes))]
+
         data.spikes[signal_id] = np.asarray(spikes)
-        data.spikes_starts[signal_id] = np.asarray(spike_start)
-        data.spikes_ends[signal_id] = np.asarray(spike_end)
-        data.spikes_amplitudes[signal_id] = np.asarray(spike_amplitude)
+        data.spikes_starts[signal_id] = np.asarray(crossings)
+        data.spikes_ends[signal_id] = np.asarray(spikes_ends)
+        data.spikes_amplitudes[signal_id] = np.asarray(spikes_amplitudes)
 
         data.spike_stream[signal_id] = np.empty(len(signals[:, signal_id]))
         data.spike_stream[signal_id][:] = np.nan
         for peak_id in range(0, len(spikes)):
-            for curr_id in range(spike_start[peak_id], spike_end[peak_id] + 1):
+            for curr_id in range(crossings[peak_id], spikes_ends[peak_id] + 1):
                 data.spike_stream[signal_id][curr_id] = signals[curr_id, signal_id]
+
+
+def detect_threshold_crossings(signal, fs, threshold, dead_time):
+    dead_time_idx = dead_time * fs
+    threshold_crossings = np.diff((signal <= threshold).astype(int) > 0).nonzero()[0]
+    distance_sufficient = np.insert(np.diff(threshold_crossings) >= dead_time_idx, 0, True)
+    while not np.all(distance_sufficient):
+        threshold_crossings = threshold_crossings[distance_sufficient]
+        distance_sufficient = np.insert(np.diff(threshold_crossings) >= dead_time_idx, 0, True)
+    return threshold_crossings
+
+
+def get_next_minimum(signal, index, max_samples_to_search):
+    search_end_idx = min(index + max_samples_to_search, signal.shape[0])
+    min_idx = np.argmin(signal[index:search_end_idx])
+    return index + min_idx
+
+
+def get_spike_peaks(signal, fs, threshold_crossings, search_range):
+    search_end = int(search_range * fs)
+    spikes_peaks = [get_next_minimum(signal, t, search_end) for t in threshold_crossings]
+    return np.array(spikes_peaks)
+
+
+def get_next_maximum(signal, index, max_samples_to_search):
+    search_end_idx = min(index + max_samples_to_search, signal.shape[0])
+    max_idx = np.argmax(signal[index:search_end_idx])
+    return index + max_idx
+
+
+def get_next_zero_crossing(signal, index, max_samples_to_search):
+    search_end_idx = min(index + max_samples_to_search, signal.shape[0])
+    for i in range(index, search_end_idx):
+        if signal[i] <= 0.0:
+            zero_crossing_idx = i
+            break
+    if 'zero_crossing_idx' not in locals():
+        zero_crossing_idx = i
+    return zero_crossing_idx
+
+
+def get_spike_ends(signal, fs, minima, search_range):
+    search_end = int(search_range * fs)
+    spikes_maxima = [get_next_maximum(signal, t, search_end) for t in minima]
+    spikes_ends = [get_next_zero_crossing(signal, t, search_end) for t in spikes_maxima]
+    return np.array(spikes_ends), np.array(spikes_maxima)
 
 
 def find_burstlets(data):
