@@ -10,7 +10,7 @@ def find_spikes(data):
         noise_rms = np.sqrt(np.mean(signals[:, signal_id] ** 2))
         noise_mad = np.median(np.absolute(signals[:, signal_id])) / 0.6745
 
-        crossings = detect_threshold_crossings(signals[:, signal_id], data.fs, -5.0 * noise_mad, 0.003)
+        crossings = detect_threshold_crossings(signals[:, signal_id], data.fs, -5.0 * noise_mad, 0.003)  # 3 ms
         spikes = get_spike_peaks(signals[:, signal_id], data.fs, crossings, 0.002)
         spikes_ends, spikes_maxima = get_spike_ends(signals[:, signal_id], data.fs, crossings, 0.002)
         spikes_amplitudes = [signals[:, signal_id][spikes_maxima[spike_id]] - signals[:, signal_id][spikes[spike_id]]
@@ -80,7 +80,7 @@ def find_burstlets(data):
     signals = data.stream
     spikes = data.spikes
     num_signals = signals.shape[1]
-    window = 100 * 10  # 100 ms
+    window = 0.1 * data.fs  # 100 ms
     for signal_id in range(0, num_signals):
         data.burstlets[signal_id] = []
         num_spikes = len(spikes[signal_id])
@@ -133,6 +133,9 @@ def find_bursts(data):
     burst_detection_function = np.empty(signal_len, dtype=int)
     burst_detection_function[:] = 0
     for signal_id in range(0, num_signals):
+        data.bursts_starts[signal_id] = []
+        data.bursts_ends[signal_id] = []
+        data.bursts_burstlets[signal_id] = []
         for burstlet_id in range(0, len(data.burstlets[signal_id])):
             curr_burstlet_start = data.burstlets_starts[signal_id][burstlet_id]
             curr_burstlet_end = data.burstlets_ends[signal_id][burstlet_id]
@@ -140,4 +143,42 @@ def find_bursts(data):
     threshold_crossings = np.diff(burst_detection_function > 5, prepend=False)
     threshold_crossings_ids = np.argwhere(threshold_crossings)[:, 0]
     interval_tree = create_interval_tree(data)
+    for interval_id in range(0, len(threshold_crossings_ids) // 2):
+        interval_start = threshold_crossings_ids[interval_id * 2]
+        interval_end = threshold_crossings_ids[interval_id * 2 + 1]
+        interval_len = interval_end - interval_start
+        curr_start = interval_start + int(0.25 * interval_len)
+        curr_end = interval_end - int(0.25 * interval_len)
+        curr_intervals = interval_tree.overlap(curr_start, curr_end)
+        if len(curr_intervals) > 5:
+            data.bursts.append(curr_intervals)
+            curr_signals = []
+            curr_burstlets = []
+            for interval in curr_intervals:
+                curr_data = interval.data
+                curr_signals.append(curr_data['signal_id'])
+                curr_burstlets.append(curr_data['burstlet_id'])
+            for i in range(0, len(curr_signals)):
+                curr_signal = curr_signals[i]
+                curr_burstlet = curr_burstlets[i]
+                data.bursts_starts[curr_signal].append(curr_start)
+                data.bursts_ends[curr_signal].append(curr_end)
+                data.bursts_burstlets[curr_signal].append(curr_burstlet)
 
+    for signal_id in range(0, num_signals):
+        data.burst_stream[signal_id] = np.empty(len(signals[:, signal_id]))
+        data.burst_stream[signal_id][:] = np.nan
+        data.burst_borders[signal_id] = np.empty(len(signals[:, signal_id]))
+        data.burst_borders[signal_id][:] = np.nan
+        for burst_id in range(0, len(data.bursts_starts[signal_id])):
+            curr_start = data.bursts_starts[signal_id][burst_id]
+            curr_end = data.bursts_ends[signal_id][burst_id]
+            data.burst_borders[signal_id][curr_start] = max(data.burstlets_amplitudes[signal_id])
+            data.burst_borders[signal_id][curr_start + 1] = - max(data.burstlets_amplitudes[signal_id])
+            data.burst_borders[signal_id][curr_end] = max(data.burstlets_amplitudes[signal_id])
+            data.burst_borders[signal_id][curr_end + 1] = - max(data.burstlets_amplitudes[signal_id])
+        for burst_id in range(0, len(data.burstlets[signal_id])):
+            if burst_id in data.bursts_burstlets[signal_id]:
+                for curr_id in range(data.burstlets_starts[signal_id][burst_id],
+                                     data.burstlets_ends[signal_id][burst_id] + 1):
+                    data.burst_stream[signal_id][curr_id] = signals[curr_id, signal_id]
