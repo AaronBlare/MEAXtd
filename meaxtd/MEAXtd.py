@@ -4,6 +4,7 @@ import pyqtgraph as pg
 from meaxtd.read_h5 import read_h5_file
 from meaxtd.hdf5plot import HDF5Plot, HDF5PlotXY
 from meaxtd.find_bursts import find_spikes, find_burstlets, find_bursts
+from meaxtd.stat_plots import raster_plot
 from PySide2.QtCore import Qt
 from PySide2.QtGui import QIcon
 from PySide2.QtWidgets import (QAction, QApplication, QDesktopWidget, QDialog, QFileDialog,
@@ -46,8 +47,15 @@ class MEAXtd(QMainWindow):
         self.plot_tab.layout.addWidget(self.plot.buttonGroupBox)
         self.plot_tab.setLayout(self.plot_tab.layout)
 
+        self.stat_tab = QWidget()
+        self.stat = StatDialog()
+        self.stat_tab.layout = QVBoxLayout(self)
+        self.stat_tab.layout.addWidget(self.stat.horizontalGroupBox)
+        self.stat_tab.setLayout(self.stat_tab.layout)
+
         self.tabs.addTab(self.main_tab, "Main")
         self.tabs.addTab(self.plot_tab, "Plot")
+        self.tabs.addTab(self.stat_tab, "Stat")
 
         self.setCentralWidget(self.tabs)
 
@@ -97,6 +105,7 @@ class MEAXtd(QMainWindow):
             self.data = read_h5_file(filename)
             self.spikeqbtn.setEnabled(True)
             self.plot.set_data(self.data)
+            self.stat.set_data(self.data)
             self.plot.plot_signals()
 
     def spike_button(self, layout):
@@ -115,6 +124,7 @@ class MEAXtd(QMainWindow):
         self.plot.signalrbtn.setChecked(True)
         self.plot.spikerbtn.setCheckable(True)
         self.burstqbtn.setEnabled(True)
+        self.stat.plot_raster()
 
     def burst_button(self, layout):
         self.burstqbtn = QPushButton('Find Bursts', self)
@@ -354,7 +364,7 @@ class PlotDialog(QDialog):
             curr_signal = int(self.signalComboBox.currentText()) - 1
             curr_spike = self.data.spikes[curr_signal][self.spike_id]
             curr_spike_amplitude = self.data.spikes_amplitudes[curr_signal][self.spike_id]
-            if self.spike_id < len(self.data.spikes[curr_signal]):
+            if self.spike_id < len(self.data.spikes[curr_signal]) - 1:
                 self.spike_id += 1
             left_border = max(0, self.data.time[curr_spike] - 0.5)
             right_border = min(len(self.data.time), self.data.time[curr_spike] + 0.5)
@@ -370,7 +380,7 @@ class PlotDialog(QDialog):
             curr_burstlet = self.data.burstlets[curr_signal][self.burstlet_id]
             curr_burstlet_start = self.data.burstlets_starts[curr_signal][self.burstlet_id]
             curr_burstlet_end = self.data.burstlets_ends[curr_signal][self.burstlet_id]
-            if self.burstlet_id < len(self.data.burstlets[curr_signal]):
+            if self.burstlet_id < len(self.data.burstlets[curr_signal]) - 1:
                 self.burstlet_id += 1
             curr_burstlet_len = self.data.time[curr_burstlet_end] - self.data.time[curr_burstlet_start]
             if curr_burstlet_len > 1:
@@ -391,7 +401,7 @@ class PlotDialog(QDialog):
             curr_signal = int(self.signalComboBox.currentText()) - 1
             curr_burst_start = self.data.bursts_starts[curr_signal][self.burst_id]
             curr_burst_end = self.data.bursts_ends[curr_signal][self.burst_id]
-            if self.burst_id < len(self.data.bursts):
+            if self.burst_id < len(self.data.bursts) - 1:
                 self.burst_id += 1
             curr_burst_len = self.data.time[curr_burst_end] - self.data.time[curr_burst_start]
             if curr_burst_len > 1:
@@ -425,7 +435,7 @@ class PlotDialog(QDialog):
             curr_burstlet = self.data.burstlets[curr_signal][self.burstlet_id]
             curr_burstlet_start = self.data.burstlets_starts[curr_signal][self.burstlet_id]
             curr_burstlet_end = self.data.burstlets_ends[curr_signal][self.burstlet_id]
-            if self.burstlet_id < len(self.data.burstlets[curr_signal]):
+            if self.burstlet_id > 0:
                 self.burstlet_id -= 1
             curr_burstlet_len = curr_burstlet_end - curr_burstlet_start
             if curr_burstlet_len > 1:
@@ -446,7 +456,7 @@ class PlotDialog(QDialog):
             curr_signal = int(self.signalComboBox.currentText()) - 1
             curr_burst_start = self.data.bursts_starts[curr_signal][self.burst_id]
             curr_burst_end = self.data.bursts_ends[curr_signal][self.burst_id]
-            if self.burst_id < len(self.data.bursts):
+            if self.burst_id > 0:
                 self.burst_id -= 1
             curr_burst_len = self.data.time[curr_burst_end] - self.data.time[curr_burst_start]
             if curr_burst_len > 1:
@@ -456,6 +466,59 @@ class PlotDialog(QDialog):
                 left_border = self.data.time[curr_burst_start] - (1 - curr_burst_len) / 2
                 right_border = self.data.time[curr_burst_end] + (1 - curr_burst_len) / 2
             self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
+
+
+class StatDialog(QDialog):
+
+    def __init__(self, data=None):
+        super().__init__()
+        self.data = data
+        self.initUI()
+
+    def set_data(self, data):
+        self.data = data
+
+    def initUI(self):
+        self.createPlotLayout()
+
+    def createPlotLayout(self):
+        self.horizontalGroupBox = QGroupBox()
+        layout = QGridLayout()
+
+        num_rows = 1
+        num_columns = 1
+
+        plots = []
+
+        for row_id in range(0, num_rows):
+            layout.setColumnStretch(row_id, num_columns)
+
+        for col_id in range(0, num_columns):
+            for row_id in range(0, num_rows):
+                curr_id = col_id * num_rows + row_id
+                curr_plot = pg.PlotWidget()
+                curr_plot.enableAutoRange(False, False)
+                curr_plot.setXRange(0, 60)
+                curr_plot.setYRange(0, 60.5)
+                curr_plot.setLabel('left', 'Electrode')
+                curr_plot.setLabel('bottom', 'Time (s)')
+                curr_plot.setLimits(yMin=-1, yMax=62, minYRange=1)
+                if self.data:
+                    if self.data.spikes:
+                        rplot = raster_plot(self.data)
+                        curr_plot.addItem(rplot)
+                layout.addWidget(curr_plot, col_id, row_id)
+                plots.append(curr_plot)
+
+        self.horizontalGroupBox.setLayout(layout)
+
+    def plot_raster(self):
+        num_rows = 1
+        num_columns = 1
+        for col_id in range(0, num_columns):
+            for row_id in range(0, num_rows):
+                rplot = raster_plot(self.data)
+                self.horizontalGroupBox.layout().itemAtPosition(col_id, row_id).widget().addItem(rplot)
 
 
 def main(args=sys.argv):

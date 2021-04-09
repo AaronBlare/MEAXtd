@@ -161,8 +161,8 @@ def find_bursts(data):
             for i in range(0, len(curr_signals)):
                 curr_signal = curr_signals[i]
                 curr_burstlet = curr_burstlets[i]
-                data.bursts_starts[curr_signal].append(curr_start)
-                data.bursts_ends[curr_signal].append(curr_end)
+                data.bursts_starts[curr_signal].append(interval_start)
+                data.bursts_ends[curr_signal].append(interval_end)
                 data.bursts_burstlets[curr_signal].append(curr_burstlet)
 
     for signal_id in range(0, num_signals):
