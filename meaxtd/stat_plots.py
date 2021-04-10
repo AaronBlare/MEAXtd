@@ -18,5 +18,5 @@ def raster_plot(data):
             nodes[node_id, 0] = data.time[curr_spike]
             nodes[node_id, 1] = signal_id + 1
             node_id += 1
-    g.setData(pos=nodes, adj=edges, symbolPen=pg.mkPen('w', width=2))
+    g.setData(pos=nodes, adj=edges, symbolPen=pg.mkPen('w', width=1))
     return g

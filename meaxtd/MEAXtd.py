@@ -5,7 +5,7 @@ from meaxtd.read_h5 import read_h5_file
 from meaxtd.hdf5plot import HDF5Plot, HDF5PlotXY
 from meaxtd.find_bursts import find_spikes, find_burstlets, find_bursts
 from meaxtd.stat_plots import raster_plot
-from PySide2.QtCore import Qt
+from PySide2.QtCore import Qt, QSize, QRect
 from PySide2.QtGui import QIcon
 from PySide2.QtWidgets import (QAction, QApplication, QDesktopWidget, QDialog, QFileDialog,
                                QHBoxLayout, QLabel, QMainWindow, QToolBar, QVBoxLayout, QWidget, QTabWidget,
@@ -33,12 +33,8 @@ class MEAXtd(QMainWindow):
 
         self.tabs = QTabWidget(self)
         self.main_tab = QWidget()
-
-        self.main_tab.layout = QHBoxLayout(self)
-        self.spike_button(self.main_tab.layout)
-        self.burst_button(self.main_tab.layout)
+        self.createButtonGroupBox()
         self.tool_bar_items()
-        self.main_tab.setLayout(self.main_tab.layout)
 
         self.plot_tab = QWidget()
         self.plot = PlotDialog()
@@ -108,13 +104,17 @@ class MEAXtd(QMainWindow):
             self.stat.set_data(self.data)
             self.plot.plot_signals()
 
-    def spike_button(self, layout):
-        self.spikeqbtn = QPushButton('Find Spikes', self)
+    def createButtonGroupBox(self):
+        self.buttonGroupBox = QGroupBox(self.main_tab)
+        self.buttonGroupBox.setGeometry(QRect(30, 30, 1000, 700))
+        self.spike_button()
+        self.burst_button()
+
+    def spike_button(self):
+        self.spikeqbtn = QPushButton(self.buttonGroupBox, text='Find Spikes')
+        self.spikeqbtn.setStyleSheet('QPushButton {font-size: 23px;}')
+        self.spikeqbtn.setGeometry(QRect(40, 40, 200, 60))
         self.spikeqbtn.setEnabled(False)
-        self.spikeqbtn.resize(100, 50)
-        layout.addWidget(self.spikeqbtn)
-        layout.addStretch(1)
-        self.setLayout(layout)
         self.spikeqbtn.clicked.connect(lambda: self.find_spikes())
 
     def find_spikes(self):
@@ -126,13 +126,11 @@ class MEAXtd(QMainWindow):
         self.burstqbtn.setEnabled(True)
         self.stat.plot_raster()
 
-    def burst_button(self, layout):
-        self.burstqbtn = QPushButton('Find Bursts', self)
+    def burst_button(self):
+        self.burstqbtn = QPushButton(self.buttonGroupBox, text='Find Bursts')
+        self.burstqbtn.setStyleSheet('QPushButton {font-size: 23px;}')
+        self.burstqbtn.setGeometry(QRect(40, 120, 200, 60))
         self.burstqbtn.setEnabled(False)
-        self.burstqbtn.resize(100, 50)
-        layout.addWidget(self.burstqbtn)
-        layout.addStretch(1)
-        self.setLayout(layout)
         self.burstqbtn.clicked.connect(lambda: self.find_bursts())
 
     def find_bursts(self):
