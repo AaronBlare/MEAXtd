@@ -2,10 +2,10 @@ import sys
 import pkg_resources
 import pyqtgraph as pg
 from meaxtd.read_h5 import read_h5_file
-from meaxtd.hdf5plot import HDF5Plot, HDF5PlotXY
-from meaxtd.find_bursts import find_spikes, find_burstlets, find_bursts
+from meaxtd.hdf5plot import HDF5PlotXY
+from meaxtd.find_bursts import find_spikes, find_bursts
 from meaxtd.stat_plots import raster_plot
-from PySide2.QtCore import Qt, QSize, QRect
+from PySide2.QtCore import Qt, QRect
 from PySide2.QtGui import QIcon
 from PySide2.QtWidgets import (QAction, QApplication, QDesktopWidget, QDialog, QFileDialog,
                                QHBoxLayout, QLabel, QMainWindow, QToolBar, QVBoxLayout, QWidget, QTabWidget,
@@ -15,23 +15,26 @@ from PySide2.QtWidgets import (QAction, QApplication, QDesktopWidget, QDialog, Q
 class MEAXtd(QMainWindow):
     """Create the main window that stores all of the widgets necessary for the application."""
 
-    def __init__(self, parent=None):
+    def __init__(self, rect, parent=None):
         """Initialize the components of the main window."""
         super(MEAXtd, self).__init__(parent)
         self.setWindowTitle('MEAXtd')
         window_icon = pkg_resources.resource_filename('meaxtd.images',
                                                       'ic_insert_drive_file_black_48dp_1x.png')
         self.setWindowIcon(QIcon(window_icon))
-        self.resize(2000, 900)
+        self.av_width = rect.width()
+        self.av_height = rect.height()
+        self.resize(int(self.av_width * 0.9), int(self.av_height * 0.75))
 
         self.menu_bar = self.menuBar()
         self.about_dialog = AboutDialog()
         self.status_bar = self.statusBar()
-        self.status_bar.showMessage('Ready', 5000)
+        self.status_bar.showMessage('Ready')
         self.file_menu()
         self.help_menu()
 
         self.tabs = QTabWidget(self)
+
         self.main_tab = QWidget()
         self.createButtonGroupBox()
         self.tool_bar_items()
@@ -54,6 +57,14 @@ class MEAXtd(QMainWindow):
         self.tabs.addTab(self.stat_tab, "Stat")
 
         self.setCentralWidget(self.tabs)
+        self.center()
+
+    def center(self):
+        frame_gm = self.frameGeometry()
+        screen = QApplication.desktop().screenNumber(QApplication.desktop().cursor().pos())
+        center_point = QApplication.desktop().screenGeometry(screen).center()
+        frame_gm.moveCenter(center_point)
+        self.move(frame_gm.topLeft())
 
     def file_menu(self):
         """Create a file submenu with an Open File item that opens a file dialog."""
@@ -521,10 +532,8 @@ class StatDialog(QDialog):
 
 def main(args=sys.argv):
     application = QApplication(args)
-    window = MEAXtd()
-    desktop = QDesktopWidget().availableGeometry()
-    width = (desktop.width() - window.width()) / 4
-    height = (desktop.height() - window.height()) / 4
+    screen = application.primaryScreen()
+    rect = screen.availableGeometry()
+    window = MEAXtd(rect)
     window.show()
-    window.move(width, height)
     sys.exit(application.exec_())
