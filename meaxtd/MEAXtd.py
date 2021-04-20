@@ -1,15 +1,83 @@
 import sys
+import traceback
 import pkg_resources
 import pyqtgraph as pg
 from meaxtd.read_h5 import read_h5_file
 from meaxtd.hdf5plot import HDF5PlotXY
 from meaxtd.find_bursts import find_spikes, find_bursts
 from meaxtd.stat_plots import raster_plot
-from PySide2.QtCore import Qt, QRect
+from PySide2.QtCore import Qt, QRect, QRunnable, Slot, QThreadPool, QObject, Signal
 from PySide2.QtGui import QIcon
-from PySide2.QtWidgets import (QAction, QApplication, QDesktopWidget, QDialog, QFileDialog,
+from PySide2.QtWidgets import (QAction, QApplication, QDialog, QFileDialog,
                                QHBoxLayout, QLabel, QMainWindow, QToolBar, QVBoxLayout, QWidget, QTabWidget,
                                QGroupBox, QGridLayout, QPushButton, QComboBox, QRadioButton)
+
+
+class WorkerSignals(QObject):
+    """
+        Defines the signals available from a running worker thread.
+
+        Supported signals are:
+
+            finished
+                No data
+
+            error
+                tuple (exctype, value, traceback.format_exc() )
+
+            result
+                object data returned from processing, anything
+
+            progress
+                int indicating % progress
+
+    """
+    finished = Signal()
+    error = Signal(tuple)
+    result = Signal(object)
+    progress = Signal(int)
+
+
+class Worker(QRunnable):
+    """
+        Worker thread
+
+        Inherits from QRunnable to handler worker thread setup, signals and wrap-up.
+
+        :param callback: The function callback to run on this worker thread. Supplied args and
+                         kwargs will be passed through to the runner.
+        :type callback: function
+        :param args: Arguments to pass to the callback function
+        :param kwargs: Keywords to pass to the callback function
+
+    """
+
+    def __init__(self, fn, *args, **kwargs):
+        super(Worker, self).__init__()
+        # Store constructor arguments (re-used for processing)
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+        self.signals = WorkerSignals()
+
+        # Add the callback to our kwargs
+        #self.kwargs['progress_callback'] = self.signals.progress
+
+    @Slot()  # QtCore.Slot
+    def run(self):
+        """
+        Initialise the runner function with passed args, kwargs.
+        """
+        try:
+            result = self.fn(*self.args, **self.kwargs)
+        except:
+            traceback.print_exc()
+            exctype, value = sys.exc_info()[:2]
+            self.signals.error.emit((exctype, value, traceback.format_exc()))
+        else:
+            self.signals.result.emit(result)  # Return the result of the processing
+        finally:
+            self.signals.finished.emit()  # Done
 
 
 class MEAXtd(QMainWindow):
@@ -36,7 +104,7 @@ class MEAXtd(QMainWindow):
         self.tabs = QTabWidget(self)
 
         self.main_tab = QWidget()
-        self.createButtonGroupBox()
+        self.create_button_groupbox()
         self.tool_bar_items()
 
         self.plot_tab = QWidget()
@@ -59,6 +127,8 @@ class MEAXtd(QMainWindow):
         self.setCentralWidget(self.tabs)
         self.center()
 
+        self.threadpool = QThreadPool()
+
     def center(self):
         frame_gm = self.frameGeometry()
         screen = QApplication.desktop().screenNumber(QApplication.desktop().cursor().pos())
@@ -73,7 +143,7 @@ class MEAXtd(QMainWindow):
         self.open_action = QAction('Open File', self)
         self.open_action.setStatusTip('Open a file into MEAXtd.')
         self.open_action.setShortcut('CTRL+O')
-        self.open_action.triggered.connect(self.open_file)
+        self.open_action.triggered.connect(lambda: self.open_file())
 
         self.exit_action = QAction('Exit Application', self)
         self.exit_action.setStatusTip('Exit the application.')
@@ -104,18 +174,31 @@ class MEAXtd(QMainWindow):
         # tool_bar_open_action.triggered.connect(self.open_file)
         # self.tool_bar.addAction(tool_bar_open_action)
 
-    def open_file(self):
-        """Open a QFileDialog to allow the user to open a file into the application."""
-        filename, accepted = QFileDialog.getOpenFileName(self, 'Open File', filter="*.h5")
+    def read_h5_data(self, filename):
+        data = read_h5_file(filename)
+        return data
 
-        if accepted:
-            self.data = read_h5_file(filename)
+    def set_data(self, data):
+        self.data = data
+
+    def configure_buttons_after_open(self):
+        if self.data:
             self.spikeqbtn.setEnabled(True)
             self.plot.set_data(self.data)
             self.stat.set_data(self.data)
             self.plot.plot_signals()
 
-    def createButtonGroupBox(self):
+    def open_file(self):
+        """Open a QFileDialog to allow the user to open a file into the application."""
+        filename, accepted = QFileDialog.getOpenFileName(self, 'Open File', filter="*.h5")
+
+        if accepted:
+            worker = Worker(self.read_h5_data, filename=filename)
+            worker.signals.result.connect(self.set_data)
+            worker.signals.finished.connect(self.configure_buttons_after_open)
+            self.threadpool.start(worker)
+
+    def create_button_groupbox(self):
         self.buttonGroupBox = QGroupBox(self.main_tab)
         self.buttonGroupBox.setGeometry(QRect(30, 30, 1000, 700))
         self.spike_button()
@@ -191,16 +274,16 @@ class PlotDialog(QDialog):
     def __init__(self, data=None):
         super().__init__()
         self.data = data
-        self.initUI()
+        self.init_ui()
 
     def set_data(self, data):
         self.data = data
 
-    def initUI(self):
-        self.createGridLayout()
-        self.createButtonLayout()
+    def init_ui(self):
+        self.create_grid_layout()
+        self.create_button_layout()
 
-    def createGridLayout(self):
+    def create_grid_layout(self):
         self.horizontalGroupBox = QGroupBox()
         layout = QGridLayout()
 
@@ -235,7 +318,7 @@ class PlotDialog(QDialog):
 
         self.horizontalGroupBox.setLayout(layout)
 
-    def createButtonLayout(self):
+    def create_button_layout(self):
         self.buttonGroupBox = QGroupBox()
         buttonLayout = QHBoxLayout()
         buttonLayout.addStretch()
@@ -482,15 +565,15 @@ class StatDialog(QDialog):
     def __init__(self, data=None):
         super().__init__()
         self.data = data
-        self.initUI()
+        self.init_ui()
 
     def set_data(self, data):
         self.data = data
 
-    def initUI(self):
-        self.createPlotLayout()
+    def init_ui(self):
+        self.create_plot_layout()
 
-    def createPlotLayout(self):
+    def create_plot_layout(self):
         self.horizontalGroupBox = QGroupBox()
         layout = QGridLayout()
 
