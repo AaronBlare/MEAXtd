@@ -6,8 +6,8 @@ from meaxtd.read_h5 import read_h5_file
 from meaxtd.hdf5plot import HDF5PlotXY
 from meaxtd.find_bursts import find_spikes, find_bursts
 from meaxtd.stat_plots import raster_plot
-from PySide2.QtCore import Qt, QRect, QRunnable, Slot, QThreadPool, QObject, Signal
-from PySide2.QtGui import QIcon
+from PySide2.QtCore import Qt, QRect, QRunnable, Slot, QThreadPool, QObject, Signal, QSize
+from PySide2.QtGui import QIcon, QFont
 from PySide2.QtWidgets import (QAction, QApplication, QDialog, QFileDialog,
                                QHBoxLayout, QLabel, QMainWindow, QToolBar, QVBoxLayout, QWidget, QTabWidget,
                                QGroupBox, QGridLayout, QPushButton, QComboBox, QRadioButton)
@@ -104,7 +104,7 @@ class MEAXtd(QMainWindow):
         self.tabs = QTabWidget(self)
 
         self.main_tab = QWidget()
-        self.create_button_groupbox()
+        self.create_button_layout()
         self.tool_bar_items()
 
         self.plot_tab = QWidget()
@@ -183,7 +183,7 @@ class MEAXtd(QMainWindow):
 
     def configure_buttons_after_open(self):
         if self.data:
-            self.spikeqbtn.setEnabled(True)
+            self.processqbtn.setEnabled(True)
             self.plot.set_data(self.data)
             self.stat.set_data(self.data)
             self.plot.plot_signals()
@@ -198,43 +198,61 @@ class MEAXtd(QMainWindow):
             worker.signals.finished.connect(self.configure_buttons_after_open)
             self.threadpool.start(worker)
 
-    def create_button_groupbox(self):
-        self.buttonGroupBox = QGroupBox(self.main_tab)
-        self.buttonGroupBox.setGeometry(QRect(30, 30, 1000, 700))
-        self.spike_button()
-        self.burst_button()
+    def create_button_layout(self):
+        self.main_tab_widget = QWidget(self.main_tab)
+        self.main_tab_widget.setGeometry(QRect(49, 29, 421, 351))
+        self.load_button()
+        self.process_button()
 
-    def spike_button(self):
-        self.spikeqbtn = QPushButton(self.buttonGroupBox, text='Find Spikes')
-        self.spikeqbtn.setStyleSheet('QPushButton {font-size: 23px;}')
-        self.spikeqbtn.setGeometry(QRect(40, 40, 200, 60))
-        self.spikeqbtn.setEnabled(False)
-        self.spikeqbtn.clicked.connect(lambda: self.find_spikes())
+    def load_button(self):
+        self.button_layout = QVBoxLayout(self.main_tab_widget)
+        self.loadqbtn = QPushButton(self.main_tab_widget, text='Load File')
+        self.loadqbtn.setMinimumSize(QSize(0, 100))
+        self.btn_font = QFont()
+        self.btn_font.setPointSize(25)
+        self.loadqbtn.setFont(self.btn_font)
+        self.button_layout.addWidget(self.loadqbtn)
+        self.loadqbtn.clicked.connect(lambda: self.open_file())
 
-    def find_spikes(self):
+    def process_button(self):
+        self.processqbtn = QPushButton(self.main_tab_widget, text='Process')
+        self.processqbtn.setMinimumSize(QSize(0, 100))
+        self.processqbtn.setFont(self.btn_font)
+        self.processqbtn.setEnabled(False)
+        self.button_layout.addWidget(self.processqbtn)
+        self.processqbtn.clicked.connect(lambda: self.process())
+
+    def process_spikes(self):
         if not self.data.spikes:
             find_spikes(self.data)
-        self.plot.signalrbtn.setCheckable(True)
-        self.plot.signalrbtn.setChecked(True)
-        self.plot.spikerbtn.setCheckable(True)
-        self.burstqbtn.setEnabled(True)
-        self.stat.plot_raster()
 
-    def burst_button(self):
-        self.burstqbtn = QPushButton(self.buttonGroupBox, text='Find Bursts')
-        self.burstqbtn.setStyleSheet('QPushButton {font-size: 23px;}')
-        self.burstqbtn.setGeometry(QRect(40, 120, 200, 60))
-        self.burstqbtn.setEnabled(False)
-        self.burstqbtn.clicked.connect(lambda: self.find_bursts())
+    def configure_buttons_after_spike(self):
+        if self.data.spikes:
+            self.plot.signalrbtn.setCheckable(True)
+            self.plot.signalrbtn.setChecked(True)
+            self.plot.spikerbtn.setCheckable(True)
+            self.stat.plot_raster()
 
-    def find_bursts(self):
+    def process_bursts(self):
         if not self.data.bursts:
             find_bursts(self.data)
-        self.plot.signalrbtn.setCheckable(True)
-        self.plot.signalrbtn.setChecked(True)
-        self.plot.spikerbtn.setCheckable(True)
-        self.plot.burstletrbtn.setCheckable(True)
-        self.plot.burstrbtn.setCheckable(True)
+
+    def configure_buttons_after_burst(self):
+        if self.data.bursts:
+            self.plot.signalrbtn.setCheckable(True)
+            self.plot.signalrbtn.setChecked(True)
+            self.plot.spikerbtn.setCheckable(True)
+            self.plot.burstletrbtn.setCheckable(True)
+            self.plot.burstrbtn.setCheckable(True)
+
+    def process(self):
+        worker = Worker(self.process_spikes)
+        worker.signals.finished.connect(self.configure_buttons_after_spike)
+        self.threadpool.start(worker)
+
+        worker = Worker(self.process_bursts)
+        worker.signals.finished.connect(self.configure_buttons_after_burst)
+        self.threadpool.start(worker)
 
 
 class AboutDialog(QDialog):
@@ -287,8 +305,8 @@ class PlotDialog(QDialog):
         self.horizontalGroupBox = QGroupBox()
         layout = QGridLayout()
 
-        num_rows = 12
-        num_columns = 5
+        num_rows = 10
+        num_columns = 6
 
         plots = []
 
@@ -369,8 +387,8 @@ class PlotDialog(QDialog):
         self.buttonGroupBox.setLayout(buttonLayout)
 
     def plot_signals(self):
-        num_rows = 12
-        num_columns = 5
+        num_rows = 10
+        num_columns = 6
         for col_id in range(0, num_columns):
             for row_id in range(0, num_rows):
                 curr_id = col_id * num_rows + row_id
@@ -394,8 +412,8 @@ class PlotDialog(QDialog):
             self.burst_id = None
         curr_curves = self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().plotItem.curves
         if len(curr_curves) > 1:
-            num_rows = 12
-            num_columns = 5
+            num_rows = 10
+            num_columns = 6
             for curve_id in range(1, len(curr_curves)):
                 for col_id in range(0, num_columns):
                     for row_id in range(0, num_rows):
@@ -406,8 +424,8 @@ class PlotDialog(QDialog):
     def add_spike_data(self):
         if self.spikerbtn.isChecked():
             self.remove_data()
-            num_rows = 12
-            num_columns = 5
+            num_rows = 10
+            num_columns = 6
             for col_id in range(0, num_columns):
                 for row_id in range(0, num_rows):
                     curr_id = col_id * num_rows + row_id
@@ -419,8 +437,8 @@ class PlotDialog(QDialog):
     def add_burstlet_data(self):
         if self.burstletrbtn.isChecked():
             self.remove_data()
-            num_rows = 12
-            num_columns = 5
+            num_rows = 10
+            num_columns = 6
             for col_id in range(0, num_columns):
                 for row_id in range(0, num_rows):
                     curr_id = col_id * num_rows + row_id
@@ -433,8 +451,8 @@ class PlotDialog(QDialog):
     def add_burst_data(self):
         if self.burstrbtn.isChecked():
             self.remove_data()
-            num_rows = 12
-            num_columns = 5
+            num_rows = 10
+            num_columns = 6
             for col_id in range(0, num_columns):
                 for row_id in range(0, num_rows):
                     curr_id = col_id * num_rows + row_id
