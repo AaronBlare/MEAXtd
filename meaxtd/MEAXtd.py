@@ -6,11 +6,12 @@ from meaxtd.read_h5 import read_h5_file
 from meaxtd.hdf5plot import HDF5PlotXY
 from meaxtd.find_bursts import find_spikes, find_bursts
 from meaxtd.stat_plots import raster_plot
-from PySide2.QtCore import Qt, QRect, QRunnable, Slot, QThreadPool, QObject, Signal, QSize
+from PySide2.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal
 from PySide2.QtGui import QIcon, QFont
-from PySide2.QtWidgets import (QAction, QApplication, QDialog, QFileDialog,
-                               QHBoxLayout, QLabel, QMainWindow, QToolBar, QVBoxLayout, QWidget, QTabWidget,
-                               QGroupBox, QGridLayout, QPushButton, QComboBox, QRadioButton)
+from PySide2.QtWidgets import (QAction, QApplication, QDialog, QFileDialog, QLayout, QFrame, QSizePolicy,
+                               QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget, QTabWidget, QLineEdit,
+                               QGroupBox, QGridLayout, QPushButton, QComboBox, QRadioButton, QPlainTextEdit,
+                               QProgressBar)
 
 
 class WorkerSignals(QObject):
@@ -61,7 +62,7 @@ class Worker(QRunnable):
         self.signals = WorkerSignals()
 
         # Add the callback to our kwargs
-        #self.kwargs['progress_callback'] = self.signals.progress
+        # self.kwargs['progress_callback'] = self.signals.progress
 
     @Slot()  # QtCore.Slot
     def run(self):
@@ -101,11 +102,22 @@ class MEAXtd(QMainWindow):
         self.file_menu()
         self.help_menu()
 
-        self.tabs = QTabWidget(self)
+        self.central_widget = QWidget(self)
+        central_sizePolicy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        central_sizePolicy.setHorizontalStretch(0)
+        central_sizePolicy.setVerticalStretch(0)
+        central_flag = self.central_widget.sizePolicy().hasHeightForWidth()
+        central_sizePolicy.setHeightForWidth(central_flag)
+        self.central_widget.setSizePolicy(central_sizePolicy)
+        self.main_layout = QHBoxLayout(self.central_widget)
+        self.main_layout.setSizeConstraint(QLayout.SetNoConstraint)
+
+        self.tabs = QTabWidget(self.central_widget)
 
         self.main_tab = QWidget()
-        self.create_button_layout()
-        self.tool_bar_items()
+        self.main_tab_upper_layout = QVBoxLayout(self.main_tab)
+        self.create_upper_layout()
+        self.create_bottom_layout()
 
         self.plot_tab = QWidget()
         self.plot = PlotDialog()
@@ -124,7 +136,8 @@ class MEAXtd(QMainWindow):
         self.tabs.addTab(self.plot_tab, "Plot")
         self.tabs.addTab(self.stat_tab, "Stat")
 
-        self.setCentralWidget(self.tabs)
+        self.main_layout.addWidget(self.tabs)
+        self.setCentralWidget(self.central_widget)
         self.center()
 
         self.threadpool = QThreadPool()
@@ -164,16 +177,6 @@ class MEAXtd(QMainWindow):
 
         self.help_sub_menu.addAction(self.about_action)
 
-    def tool_bar_items(self):
-        """Create a tool bar for the main window."""
-        self.tool_bar = QToolBar()
-        # self.addToolBar(Qt.TopToolBarArea, self.tool_bar)
-        # self.tool_bar.setMovable(False)
-        # open_icon = pkg_resources.resource_filename('meaxtd.images', 'ic_open_in_new_black_48dp_1x.png')
-        # tool_bar_open_action = QAction(QIcon(open_icon), 'Open File', self)
-        # tool_bar_open_action.triggered.connect(self.open_file)
-        # self.tool_bar.addAction(tool_bar_open_action)
-
     def read_h5_data(self, filename):
         data = read_h5_file(filename)
         return data
@@ -198,28 +201,102 @@ class MEAXtd(QMainWindow):
             worker.signals.finished.connect(self.configure_buttons_after_open)
             self.threadpool.start(worker)
 
-    def create_button_layout(self):
-        self.main_tab_widget = QWidget(self.main_tab)
-        self.main_tab_widget.setGeometry(QRect(49, 29, 421, 351))
+    def create_upper_layout(self):
+        self.main_tab_upper_groupbox = QGroupBox(self.main_tab)
+        self.main_tab_upper_groupbox_layout = QHBoxLayout(self.main_tab_upper_groupbox)
+
+        # Frame for Load and Process buttons
+        self.frame = QFrame(self.main_tab_upper_groupbox)
+        self.frame.setFrameShape(QFrame.StyledPanel)
+        self.frame.setFrameShadow(QFrame.Raised)
+        self.main_tab_button_layout = QVBoxLayout(self.frame)
+        self.main_tab_button_layout.setContentsMargins(70, 50, 70, 50)
         self.load_button()
         self.process_button()
+        self.main_tab_upper_groupbox_layout.addWidget(self.frame)
+
+        # Spike Parameters Groupbox
+        self.spike_params_groupbox = QGroupBox(self.main_tab_upper_groupbox, title="Spike Parameters")
+
+        self.gbox_font = QFont()
+        self.gbox_font.setPointSize(18)
+
+        self.spike_params_groupbox.setFont(self.gbox_font)
+        self.spike_grid_layout = QGridLayout(self.spike_params_groupbox)
+        self.spike_grid_layout.setContentsMargins(50, 20, 50, 20)
+
+        self.spike_method_label = QLabel(self.spike_params_groupbox, text="Method")
+        self.spike_grid_layout.addWidget(self.spike_method_label, 0, 0, 1, 1)
+
+        self.spike_method_combobox = QComboBox(self.spike_params_groupbox)
+        self.size_policy1 = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Maximum)
+        self.size_policy1.setHorizontalStretch(0)
+        self.size_policy1.setVerticalStretch(0)
+        policy_flag = self.spike_method_combobox.sizePolicy().hasHeightForWidth()
+        self.size_policy1.setHeightForWidth(policy_flag)
+        self.spike_method_combobox.setSizePolicy(self.size_policy1)
+        self.spike_grid_layout.addWidget(self.spike_method_combobox, 0, 1, 1, 1)
+
+        self.spike_coeff_label = QLabel(self.spike_params_groupbox, text="Coefficient")
+        self.spike_grid_layout.addWidget(self.spike_coeff_label, 1, 0, 1, 1)
+
+        self.spike_coeff = QLineEdit(self.spike_params_groupbox)
+        policy_flag = self.spike_coeff.sizePolicy().hasHeightForWidth()
+        self.size_policy1.setHeightForWidth(policy_flag)
+        self.spike_coeff.setSizePolicy(self.size_policy1)
+        self.spike_grid_layout.addWidget(self.spike_coeff, 1, 1, 1, 1)
+
+        self.main_tab_upper_groupbox_layout.addWidget(self.spike_params_groupbox)
+
+        # Burst Parameters Groupbox
+        self.burst_param_groupbox = QGroupBox(self.main_tab_upper_groupbox, title="Burst Parameters")
+        self.burst_param_groupbox.setFont(self.gbox_font)
+        self.burst_grid_layout = QGridLayout(self.burst_param_groupbox)
+        self.burst_grid_layout.setContentsMargins(50, 20, 50, 20)
+
+        self.burst_window_label = QLabel(self.burst_param_groupbox, text="Window size, ms")
+        self.burst_grid_layout.addWidget(self.burst_window_label, 0, 0, 1, 1)
+
+        self.burst_window_size = QLineEdit(self.burst_param_groupbox)
+        policy_flag = self.burst_window_size.sizePolicy().hasHeightForWidth()
+        self.size_policy1.setHeightForWidth(policy_flag)
+        self.burst_window_size.setSizePolicy(self.size_policy1)
+        self.burst_grid_layout.addWidget(self.burst_window_size, 0, 1, 1, 1)
+
+        self.burst_num_channels_label = QLabel(self.burst_param_groupbox, text="Num channels")
+        self.burst_grid_layout.addWidget(self.burst_num_channels_label, 1, 0, 1, 1)
+
+        self.burst_num_channels = QLineEdit(self.burst_param_groupbox)
+        policy_flag = self.burst_num_channels.sizePolicy().hasHeightForWidth()
+        self.size_policy1.setHeightForWidth(policy_flag)
+        self.burst_num_channels.setSizePolicy(self.size_policy1)
+        self.burst_grid_layout.addWidget(self.burst_num_channels, 1, 1, 1, 1)
+
+        self.main_tab_upper_groupbox_layout.addWidget(self.burst_param_groupbox)
+        self.main_tab_upper_layout.addWidget(self.main_tab_upper_groupbox)
 
     def load_button(self):
-        self.button_layout = QVBoxLayout(self.main_tab_widget)
-        self.loadqbtn = QPushButton(self.main_tab_widget, text='Load File')
-        self.loadqbtn.setMinimumSize(QSize(0, 100))
+        self.loadqbtn = QPushButton(self.frame, text='Load File')
+        self.sizePolicy = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        self.sizePolicy.setHorizontalStretch(0)
+        self.sizePolicy.setVerticalStretch(0)
+        self.sizePolicy.setHeightForWidth(self.loadqbtn.sizePolicy().hasHeightForWidth())
+        self.loadqbtn.setSizePolicy(self.sizePolicy)
+
         self.btn_font = QFont()
         self.btn_font.setPointSize(25)
+
         self.loadqbtn.setFont(self.btn_font)
-        self.button_layout.addWidget(self.loadqbtn)
+        self.main_tab_button_layout.addWidget(self.loadqbtn)
         self.loadqbtn.clicked.connect(lambda: self.open_file())
 
     def process_button(self):
-        self.processqbtn = QPushButton(self.main_tab_widget, text='Process')
-        self.processqbtn.setMinimumSize(QSize(0, 100))
+        self.processqbtn = QPushButton(self.frame, text='Process')
+        self.sizePolicy.setHeightForWidth(self.processqbtn.sizePolicy().hasHeightForWidth())
+        self.processqbtn.setSizePolicy(self.sizePolicy)
         self.processqbtn.setFont(self.btn_font)
         self.processqbtn.setEnabled(False)
-        self.button_layout.addWidget(self.processqbtn)
+        self.main_tab_button_layout.addWidget(self.processqbtn)
         self.processqbtn.clicked.connect(lambda: self.process())
 
     def process_spikes(self):
@@ -253,6 +330,34 @@ class MEAXtd(QMainWindow):
         worker = Worker(self.process_bursts)
         worker.signals.finished.connect(self.configure_buttons_after_burst)
         self.threadpool.start(worker)
+
+    def create_param_groupbox(self):
+        self.param_layout = QHBoxLayout(self.main_tab_param_widget)
+        self.param_groupbox = QGroupBox(self.main_tab_param_widget, title="Parameters")
+        self.gbox_font = QFont()
+        self.gbox_font.setPointSize(18)
+        self.param_groupbox.setFont(self.gbox_font)
+        self.param_layout.addWidget(self.param_groupbox)
+
+    def create_bottom_layout(self):
+        self.main_tab_bottom_groupbox = QGroupBox(self.main_tab)
+        self.main_tab_bottom_groupbox.setFont(self.gbox_font)
+        self.log_groupbox_layout = QVBoxLayout(self.main_tab_bottom_groupbox)
+
+        self.log_window = QPlainTextEdit(self.main_tab_bottom_groupbox)
+        self.size_policy2 = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+        self.size_policy2.setHorizontalStretch(0)
+        self.size_policy2.setVerticalStretch(0)
+        size_policy_flag = self.log_window.sizePolicy().hasHeightForWidth()
+        self.size_policy2.setHeightForWidth(size_policy_flag)
+        self.log_window.setSizePolicy(self.size_policy2)
+        self.log_groupbox_layout.addWidget(self.log_window)
+
+        self.progressBar = QProgressBar(self.main_tab_bottom_groupbox)
+        self.progressBar.setValue(10)
+        self.log_groupbox_layout.addWidget(self.progressBar)
+
+        self.main_tab_upper_layout.addWidget(self.main_tab_bottom_groupbox)
 
 
 class AboutDialog(QDialog):
