@@ -11,7 +11,7 @@ from PySide2.QtGui import QIcon, QFont
 from PySide2.QtWidgets import (QAction, QApplication, QDialog, QFileDialog, QLayout, QFrame, QSizePolicy,
                                QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget, QTabWidget, QLineEdit,
                                QGroupBox, QGridLayout, QPushButton, QComboBox, QRadioButton, QPlainTextEdit,
-                               QProgressBar)
+                               QProgressBar, QDoubleSpinBox, QSpinBox)
 
 
 class WorkerSignals(QObject):
@@ -226,6 +226,8 @@ class MEAXtd(QMainWindow):
         self.spike_grid_layout.setContentsMargins(50, 20, 50, 20)
 
         self.spike_method_label = QLabel(self.spike_params_groupbox, text="Method")
+        self.spike_method_label.setToolTip("Method for spike searching")
+        self.spike_method_label.setToolTipDuration(1000)
         self.spike_grid_layout.addWidget(self.spike_method_label, 0, 0, 1, 1)
 
         self.spike_method_combobox = QComboBox(self.spike_params_groupbox)
@@ -235,15 +237,22 @@ class MEAXtd(QMainWindow):
         policy_flag = self.spike_method_combobox.sizePolicy().hasHeightForWidth()
         self.size_policy1.setHeightForWidth(policy_flag)
         self.spike_method_combobox.setSizePolicy(self.size_policy1)
+        spike_methods = ['Median', 'RMS', 'std']
+        self.spike_method_combobox.addItems(spike_methods)
         self.spike_grid_layout.addWidget(self.spike_method_combobox, 0, 1, 1, 1)
 
         self.spike_coeff_label = QLabel(self.spike_params_groupbox, text="Coefficient")
+        self.spike_coeff_label.setToolTip("Coefficient for noise value")
+        self.spike_coeff_label.setToolTipDuration(1000)
         self.spike_grid_layout.addWidget(self.spike_coeff_label, 1, 0, 1, 1)
 
-        self.spike_coeff = QLineEdit(self.spike_params_groupbox)
+        self.spike_coeff = QDoubleSpinBox(self.spike_params_groupbox)
         policy_flag = self.spike_coeff.sizePolicy().hasHeightForWidth()
         self.size_policy1.setHeightForWidth(policy_flag)
         self.spike_coeff.setSizePolicy(self.size_policy1)
+        self.spike_coeff.setMinimum(-5000.0)
+        self.spike_coeff.setMaximum(5000.0)
+        self.spike_coeff.setValue(-5.0)
         self.spike_grid_layout.addWidget(self.spike_coeff, 1, 1, 1, 1)
 
         self.main_tab_upper_groupbox_layout.addWidget(self.spike_params_groupbox)
@@ -255,21 +264,31 @@ class MEAXtd(QMainWindow):
         self.burst_grid_layout.setContentsMargins(50, 20, 50, 20)
 
         self.burst_window_label = QLabel(self.burst_param_groupbox, text="Window size, ms")
+        self.burst_window_label.setToolTip("Window size for burst")
+        self.burst_window_label.setToolTipDuration(1000)
         self.burst_grid_layout.addWidget(self.burst_window_label, 0, 0, 1, 1)
 
-        self.burst_window_size = QLineEdit(self.burst_param_groupbox)
+        self.burst_window_size = QSpinBox(self.burst_param_groupbox)
         policy_flag = self.burst_window_size.sizePolicy().hasHeightForWidth()
         self.size_policy1.setHeightForWidth(policy_flag)
         self.burst_window_size.setSizePolicy(self.size_policy1)
+        self.burst_window_size.setMinimum(0)
+        self.burst_window_size.setMaximum(1000)
+        self.burst_window_size.setValue(100)
         self.burst_grid_layout.addWidget(self.burst_window_size, 0, 1, 1, 1)
 
         self.burst_num_channels_label = QLabel(self.burst_param_groupbox, text="Num channels")
+        self.burst_num_channels_label.setToolTip("Minimal number of channels for burst")
+        self.burst_num_channels_label.setToolTipDuration(1000)
         self.burst_grid_layout.addWidget(self.burst_num_channels_label, 1, 0, 1, 1)
 
-        self.burst_num_channels = QLineEdit(self.burst_param_groupbox)
+        self.burst_num_channels = QSpinBox(self.burst_param_groupbox)
         policy_flag = self.burst_num_channels.sizePolicy().hasHeightForWidth()
         self.size_policy1.setHeightForWidth(policy_flag)
         self.burst_num_channels.setSizePolicy(self.size_policy1)
+        self.burst_num_channels.setMinimum(0)
+        self.burst_num_channels.setMaximum(60)
+        self.burst_num_channels.setValue(5)
         self.burst_grid_layout.addWidget(self.burst_num_channels, 1, 1, 1, 1)
 
         self.main_tab_upper_groupbox_layout.addWidget(self.burst_param_groupbox)
@@ -300,8 +319,9 @@ class MEAXtd(QMainWindow):
         self.processqbtn.clicked.connect(lambda: self.process())
 
     def process_spikes(self):
-        if not self.data.spikes:
-            find_spikes(self.data)
+        method = self.spike_method_combobox.currentText()
+        coeff = self.spike_coeff.value()
+        find_spikes(self.data, method, coeff)
 
     def configure_buttons_after_spike(self):
         if self.data.spikes:
@@ -311,8 +331,11 @@ class MEAXtd(QMainWindow):
             self.stat.plot_raster()
 
     def process_bursts(self):
-        if not self.data.bursts:
-            find_bursts(self.data)
+        spike_method = self.spike_method_combobox.currentText()
+        spike_coeff = self.spike_coeff.value()
+        burst_window = self.burst_window_size.value()
+        burst_num_channels = self.burst_num_channels.value()
+        find_bursts(self.data, spike_method, spike_coeff, burst_window, burst_num_channels)
 
     def configure_buttons_after_burst(self):
         if self.data.bursts:
@@ -519,7 +542,7 @@ class PlotDialog(QDialog):
         if len(curr_curves) > 1:
             num_rows = 10
             num_columns = 6
-            for curve_id in range(1, len(curr_curves)):
+            for curve_id in range(len(curr_curves) - 1, 0, -1):
                 for col_id in range(0, num_columns):
                     for row_id in range(0, num_rows):
                         curr_plot_item = self.horizontalGroupBox.layout().itemAtPosition(col_id,
