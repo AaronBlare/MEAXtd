@@ -5,7 +5,7 @@ PyVirtualDisplay==2.1
 PySide2==5.15.2
 flake8==3.8.4
 tox==3.23.0
-pyqtgraph==0.11.1
+pyqtgraph==0.12.1
 McsPyDataTools==0.4.1
 numpy==1.20.1
 wheel==0.36.2

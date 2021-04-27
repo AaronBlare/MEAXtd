@@ -2,6 +2,7 @@ import sys
 import traceback
 import pkg_resources
 import pyqtgraph as pg
+import logging
 from meaxtd.read_h5 import read_h5_file
 from meaxtd.hdf5plot import HDF5PlotXY
 from meaxtd.find_bursts import find_spikes, find_bursts
@@ -9,7 +10,7 @@ from meaxtd.stat_plots import raster_plot
 from PySide2.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal
 from PySide2.QtGui import QIcon, QFont
 from PySide2.QtWidgets import (QAction, QApplication, QDialog, QFileDialog, QLayout, QFrame, QSizePolicy,
-                               QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget, QTabWidget, QLineEdit,
+                               QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget, QTabWidget,
                                QGroupBox, QGridLayout, QPushButton, QComboBox, QRadioButton, QPlainTextEdit,
                                QProgressBar, QDoubleSpinBox, QSpinBox)
 
@@ -17,21 +18,15 @@ from PySide2.QtWidgets import (QAction, QApplication, QDialog, QFileDialog, QLay
 class WorkerSignals(QObject):
     """
         Defines the signals available from a running worker thread.
-
         Supported signals are:
-
             finished
                 No data
-
             error
                 tuple (exctype, value, traceback.format_exc() )
-
             result
                 object data returned from processing, anything
-
             progress
                 int indicating % progress
-
     """
     finished = Signal()
     error = Signal(tuple)
@@ -42,15 +37,12 @@ class WorkerSignals(QObject):
 class Worker(QRunnable):
     """
         Worker thread
-
         Inherits from QRunnable to handler worker thread setup, signals and wrap-up.
-
         :param callback: The function callback to run on this worker thread. Supplied args and
                          kwargs will be passed through to the runner.
         :type callback: function
         :param args: Arguments to pass to the callback function
         :param kwargs: Keywords to pass to the callback function
-
     """
 
     def __init__(self, fn, *args, **kwargs):
@@ -79,6 +71,23 @@ class Worker(QRunnable):
             self.signals.result.emit(result)  # Return the result of the processing
         finally:
             self.signals.finished.emit()  # Done
+
+
+class MyLog(QObject):
+    signal = Signal(str)
+
+    def __init__(self):
+        super().__init__()
+
+
+class ThreadLogger(logging.Handler):
+    def __init__(self):
+        super().__init__()
+        self.log = MyLog()
+
+    def emit(self, record):
+        msg = self.format(record)
+        self.log.signal.emit(msg)
 
 
 class MEAXtd(QMainWindow):
@@ -186,6 +195,7 @@ class MEAXtd(QMainWindow):
 
     def configure_buttons_after_open(self):
         if self.data:
+            self.logger.info(f"File loaded.")
             self.processqbtn.setEnabled(True)
             self.plot.set_data(self.data)
             self.stat.set_data(self.data)
@@ -196,6 +206,7 @@ class MEAXtd(QMainWindow):
         filename, accepted = QFileDialog.getOpenFileName(self, 'Open File', filter="*.h5")
 
         if accepted:
+            self.logger.info(f"File {filename} loading...")
             worker = Worker(self.read_h5_data, filename=filename)
             worker.signals.result.connect(self.set_data)
             worker.signals.finished.connect(self.configure_buttons_after_open)
@@ -321,10 +332,12 @@ class MEAXtd(QMainWindow):
     def process_spikes(self):
         method = self.spike_method_combobox.currentText()
         coeff = self.spike_coeff.value()
+        self.logger.info("Spikes and bursts finding...")
         find_spikes(self.data, method, coeff)
 
     def configure_buttons_after_spike(self):
         if self.data.spikes:
+            self.logger.info("Spikes found.")
             self.plot.signalrbtn.setCheckable(True)
             self.plot.signalrbtn.setChecked(True)
             self.plot.spikerbtn.setCheckable(True)
@@ -339,6 +352,7 @@ class MEAXtd(QMainWindow):
 
     def configure_buttons_after_burst(self):
         if self.data.bursts:
+            self.logger.info("Bursts found.")
             self.plot.signalrbtn.setCheckable(True)
             self.plot.signalrbtn.setChecked(True)
             self.plot.spikerbtn.setCheckable(True)
@@ -367,20 +381,35 @@ class MEAXtd(QMainWindow):
         self.main_tab_bottom_groupbox.setFont(self.gbox_font)
         self.log_groupbox_layout = QVBoxLayout(self.main_tab_bottom_groupbox)
 
+        self.logger = logging.getLogger('log')
+        self.log_handler = ThreadLogger()
+        self.log_handler.setFormatter(
+            logging.Formatter('%(asctime)s - %(message)s', "%Y-%m-%d %H:%M:%S"))
+        self.logger.addHandler(self.log_handler)
+        self.logger.setLevel(logging.INFO)
+
         self.log_window = QPlainTextEdit(self.main_tab_bottom_groupbox)
-        self.size_policy2 = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
-        self.size_policy2.setHorizontalStretch(0)
-        self.size_policy2.setVerticalStretch(0)
+        self.log_window.setReadOnly(True)
+        size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+        size_policy.setHorizontalStretch(0)
+        size_policy.setVerticalStretch(0)
         size_policy_flag = self.log_window.sizePolicy().hasHeightForWidth()
-        self.size_policy2.setHeightForWidth(size_policy_flag)
-        self.log_window.setSizePolicy(self.size_policy2)
+        size_policy.setHeightForWidth(size_policy_flag)
+        self.log_window.setSizePolicy(size_policy)
         self.log_groupbox_layout.addWidget(self.log_window)
+
+        self.log_handler.log.signal.connect(self.write_log)
 
         self.progressBar = QProgressBar(self.main_tab_bottom_groupbox)
         self.progressBar.setValue(10)
         self.log_groupbox_layout.addWidget(self.progressBar)
 
         self.main_tab_upper_layout.addWidget(self.main_tab_bottom_groupbox)
+
+    @Slot(str)
+    def write_log(self, log_text):
+        self.log_window.appendPlainText(log_text)
+        self.log_window.centerCursor()
 
 
 class AboutDialog(QDialog):
