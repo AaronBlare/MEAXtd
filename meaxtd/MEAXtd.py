@@ -212,6 +212,18 @@ class MEAXtd(QMainWindow):
             worker.signals.finished.connect(self.configure_buttons_after_open)
             self.threadpool.start(worker)
 
+    def spike_combobox_change(self):
+        self.logger.info(f"Spike method: {self.spike_method_combobox.currentText()}")
+
+    def spike_spinbox_change(self):
+        self.logger.info(f"Spike coefficient: {self.spike_coeff.value()}")
+
+    def burst_window_spinbox_change(self):
+        self.logger.info(f"Burst window: {self.burst_window_size.value()} ms")
+
+    def burst_channels_spinbox_change(self):
+        self.logger.info(f"Num channels for bursting: {self.burst_num_channels.value()}")
+
     def create_upper_layout(self):
         self.main_tab_upper_groupbox = QGroupBox(self.main_tab)
         self.main_tab_upper_groupbox_layout = QHBoxLayout(self.main_tab_upper_groupbox)
@@ -250,6 +262,7 @@ class MEAXtd(QMainWindow):
         self.spike_method_combobox.setSizePolicy(self.size_policy1)
         spike_methods = ['Median', 'RMS', 'std']
         self.spike_method_combobox.addItems(spike_methods)
+        self.spike_method_combobox.currentIndexChanged.connect(self.spike_combobox_change)
         self.spike_grid_layout.addWidget(self.spike_method_combobox, 0, 1, 1, 1)
 
         self.spike_coeff_label = QLabel(self.spike_params_groupbox, text="Coefficient")
@@ -264,6 +277,7 @@ class MEAXtd(QMainWindow):
         self.spike_coeff.setMinimum(-5000.0)
         self.spike_coeff.setMaximum(5000.0)
         self.spike_coeff.setValue(-5.0)
+        self.spike_coeff.valueChanged.connect(self.spike_spinbox_change)
         self.spike_grid_layout.addWidget(self.spike_coeff, 1, 1, 1, 1)
 
         self.main_tab_upper_groupbox_layout.addWidget(self.spike_params_groupbox)
@@ -286,6 +300,7 @@ class MEAXtd(QMainWindow):
         self.burst_window_size.setMinimum(0)
         self.burst_window_size.setMaximum(1000)
         self.burst_window_size.setValue(100)
+        self.burst_window_size.valueChanged.connect(self.burst_window_spinbox_change)
         self.burst_grid_layout.addWidget(self.burst_window_size, 0, 1, 1, 1)
 
         self.burst_num_channels_label = QLabel(self.burst_param_groupbox, text="Num channels")
@@ -300,6 +315,7 @@ class MEAXtd(QMainWindow):
         self.burst_num_channels.setMinimum(0)
         self.burst_num_channels.setMaximum(60)
         self.burst_num_channels.setValue(5)
+        self.burst_num_channels.valueChanged.connect(self.burst_channels_spinbox_change)
         self.burst_grid_layout.addWidget(self.burst_num_channels, 1, 1, 1, 1)
 
         self.main_tab_upper_groupbox_layout.addWidget(self.burst_param_groupbox)
