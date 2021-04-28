@@ -54,7 +54,7 @@ class Worker(QRunnable):
         self.signals = WorkerSignals()
 
         # Add the callback to our kwargs
-        # self.kwargs['progress_callback'] = self.signals.progress
+        self.kwargs['progress_callback'] = self.signals.progress
 
     @Slot()  # QtCore.Slot
     def run(self):
@@ -186,8 +186,8 @@ class MEAXtd(QMainWindow):
 
         self.help_sub_menu.addAction(self.about_action)
 
-    def read_h5_data(self, filename):
-        data = read_h5_file(filename)
+    def read_h5_data(self, filename, progress_callback):
+        data = read_h5_file(filename, progress_callback)
         return data
 
     def set_data(self, data):
@@ -201,6 +201,9 @@ class MEAXtd(QMainWindow):
             self.stat.set_data(self.data)
             self.plot.plot_signals()
 
+    def set_progress_value(self, value):
+        self.progressBar.setValue(value)
+
     def open_file(self):
         """Open a QFileDialog to allow the user to open a file into the application."""
         filename, accepted = QFileDialog.getOpenFileName(self, 'Open File', filter="*.h5")
@@ -210,6 +213,7 @@ class MEAXtd(QMainWindow):
             worker = Worker(self.read_h5_data, filename=filename)
             worker.signals.result.connect(self.set_data)
             worker.signals.finished.connect(self.configure_buttons_after_open)
+            worker.signals.progress.connect(self.set_progress_value)
             self.threadpool.start(worker)
 
     def spike_combobox_change(self):
@@ -345,11 +349,11 @@ class MEAXtd(QMainWindow):
         self.main_tab_button_layout.addWidget(self.processqbtn)
         self.processqbtn.clicked.connect(lambda: self.process())
 
-    def process_spikes(self):
+    def process_spikes(self, progress_callback):
         method = self.spike_method_combobox.currentText()
         coeff = self.spike_coeff.value()
         self.logger.info("Spikes and bursts finding...")
-        find_spikes(self.data, method, coeff)
+        find_spikes(self.data, method, coeff, progress_callback)
 
     def configure_buttons_after_spike(self):
         if self.data.spikes:
@@ -359,12 +363,12 @@ class MEAXtd(QMainWindow):
             self.plot.spikerbtn.setCheckable(True)
             self.stat.plot_raster()
 
-    def process_bursts(self):
+    def process_bursts(self, progress_callback):
         spike_method = self.spike_method_combobox.currentText()
         spike_coeff = self.spike_coeff.value()
         burst_window = self.burst_window_size.value()
         burst_num_channels = self.burst_num_channels.value()
-        find_bursts(self.data, spike_method, spike_coeff, burst_window, burst_num_channels)
+        find_bursts(self.data, spike_method, spike_coeff, burst_window, burst_num_channels, progress_callback)
 
     def configure_buttons_after_burst(self):
         if self.data.bursts:
@@ -378,10 +382,12 @@ class MEAXtd(QMainWindow):
     def process(self):
         worker = Worker(self.process_spikes)
         worker.signals.finished.connect(self.configure_buttons_after_spike)
+        worker.signals.progress.connect(self.set_progress_value)
         self.threadpool.start(worker)
 
         worker = Worker(self.process_bursts)
         worker.signals.finished.connect(self.configure_buttons_after_burst)
+        worker.signals.progress.connect(self.set_progress_value)
         self.threadpool.start(worker)
 
     def create_param_groupbox(self):
@@ -417,7 +423,7 @@ class MEAXtd(QMainWindow):
         self.log_handler.log.signal.connect(self.write_log)
 
         self.progressBar = QProgressBar(self.main_tab_bottom_groupbox)
-        self.progressBar.setValue(10)
+        self.progressBar.setValue(100)
         self.log_groupbox_layout.addWidget(self.progressBar)
 
         self.main_tab_upper_layout.addWidget(self.main_tab_bottom_groupbox)

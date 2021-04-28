@@ -2,10 +2,11 @@ import numpy as np
 from intervaltree import IntervalTree
 
 
-def find_spikes(data, method, coefficient):
+def find_spikes(data, method, coefficient, progress_callback):
     signals = data.stream
     num_signals = signals.shape[1]
     for signal_id in range(0, num_signals):
+        progress_callback.emit(int(signal_id * 40 / num_signals))
         if method == 'Median':
             noise_mad = np.median(np.absolute(signals[:, signal_id])) / 0.6745
             crossings = detect_threshold_crossings(signals[:, signal_id], data.fs, coefficient * noise_mad, 0.0)
@@ -79,14 +80,15 @@ def get_spike_ends(signal, fs, minima, search_range):
     return np.array(spikes_ends), np.array(spikes_maxima)
 
 
-def find_burstlets(data, spike_method, spike_coeff, burst_window):
+def find_burstlets(data, spike_method, spike_coeff, burst_window, progress_callback):
     if not data.spikes:
-        find_spikes(data, spike_method, spike_coeff)
+        find_spikes(data, spike_method, spike_coeff, progress_callback)
     signals = data.stream
     spikes = data.spikes
     num_signals = signals.shape[1]
     window = 10 * burst_window  # sampling frequency 0.1 ms
     for signal_id in range(0, num_signals):
+        progress_callback.emit(40 + int(signal_id * 40 / num_signals))
         data.burstlets[signal_id] = []
         num_spikes = len(spikes[signal_id])
         curr_burstlet = []
@@ -129,9 +131,9 @@ def create_interval_tree(data):
     return tree
 
 
-def find_bursts(data, spike_method, spike_coeff, burst_window, burst_num_channels):
+def find_bursts(data, spike_method, spike_coeff, burst_window, burst_num_channels, progress_callback):
     if not data.burstlets:
-        find_burstlets(data, spike_method, spike_coeff, burst_window)
+        find_burstlets(data, spike_method, spike_coeff, burst_window, progress_callback)
     signals = data.stream
     signal_len = len(signals[:, 0])
     num_signals = signals.shape[1]
@@ -149,6 +151,7 @@ def find_bursts(data, spike_method, spike_coeff, burst_window, burst_num_channel
     threshold_crossings_ids = np.argwhere(threshold_crossings)[:, 0]
     interval_tree = create_interval_tree(data)
     for interval_id in range(0, len(threshold_crossings_ids) // 2):
+        progress_callback.emit(80 + int(interval_id * 10 / (len(threshold_crossings_ids) // 2)))
         interval_start = threshold_crossings_ids[interval_id * 2]
         interval_end = threshold_crossings_ids[interval_id * 2 + 1]
         interval_len = interval_end - interval_start
@@ -171,6 +174,7 @@ def find_bursts(data, spike_method, spike_coeff, burst_window, burst_num_channel
                 data.bursts_burstlets[curr_signal].append(curr_burstlet)
 
     for signal_id in range(0, num_signals):
+        progress_callback.emit(90 + int(signal_id * 10 / num_signals))
         data.burst_stream[signal_id] = np.empty(len(signals[:, signal_id]))
         data.burst_stream[signal_id][:] = np.nan
         data.burst_borders[signal_id] = np.empty(len(signals[:, signal_id]))
@@ -187,3 +191,5 @@ def find_bursts(data, spike_method, spike_coeff, burst_window, burst_num_channel
                 for curr_id in range(data.burstlets_starts[signal_id][burst_id],
                                      data.burstlets_ends[signal_id][burst_id] + 1):
                     data.burst_stream[signal_id][curr_id] = signals[curr_id, signal_id]
+
+    progress_callback.emit(100)
