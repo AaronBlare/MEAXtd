@@ -21,3 +21,21 @@ class Data:
         self.bursts_burstlets = {}
         self.burst_stream = {}
         self.burst_borders = {}
+
+    def clear_calculated(self):
+        self.spikes = {}
+        self.spikes_starts = {}
+        self.spikes_ends = {}
+        self.spikes_amplitudes = {}
+        self.spike_stream = {}
+        self.burstlets = {}
+        self.burstlets_starts = {}
+        self.burstlets_ends = {}
+        self.burstlets_amplitudes = {}
+        self.burstlet_stream = {}
+        self.bursts = []
+        self.bursts_starts = {}
+        self.bursts_ends = {}
+        self.bursts_burstlets = {}
+        self.burst_stream = {}
+        self.burst_borders = {}

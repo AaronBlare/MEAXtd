@@ -6,7 +6,7 @@ def find_spikes(data, method, coefficient, progress_callback):
     signals = data.stream
     num_signals = signals.shape[1]
     for signal_id in range(0, num_signals):
-        progress_callback.emit(int(signal_id * 40 / num_signals))
+        progress_callback.emit(round(signal_id * 40 / num_signals))
         if method == 'Median':
             noise_mad = np.median(np.absolute(signals[:, signal_id])) / 0.6745
             crossings = detect_threshold_crossings(signals[:, signal_id], data.fs, coefficient * noise_mad, 0.0)
@@ -88,7 +88,7 @@ def find_burstlets(data, spike_method, spike_coeff, burst_window, progress_callb
     num_signals = signals.shape[1]
     window = 10 * burst_window  # sampling frequency 0.1 ms
     for signal_id in range(0, num_signals):
-        progress_callback.emit(40 + int(signal_id * 40 / num_signals))
+        progress_callback.emit(40 + round(signal_id * 40 / num_signals))
         data.burstlets[signal_id] = []
         num_spikes = len(spikes[signal_id])
         curr_burstlet = []
@@ -174,7 +174,7 @@ def find_bursts(data, spike_method, spike_coeff, burst_window, burst_num_channel
                 data.bursts_burstlets[curr_signal].append(curr_burstlet)
 
     for signal_id in range(0, num_signals):
-        progress_callback.emit(90 + int(signal_id * 10 / num_signals))
+        progress_callback.emit(90 + round(signal_id * 10 / num_signals))
         data.burst_stream[signal_id] = np.empty(len(signals[:, signal_id]))
         data.burst_stream[signal_id][:] = np.nan
         data.burst_borders[signal_id] = np.empty(len(signals[:, signal_id]))

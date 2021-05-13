@@ -15,6 +15,10 @@ from PySide2.QtWidgets import (QAction, QApplication, QDialog, QFileDialog, QLay
                                QProgressBar, QDoubleSpinBox, QSpinBox)
 
 
+pg.setConfigOption('background', 'w')
+pg.setConfigOption('foreground', 'k')
+
+
 class WorkerSignals(QObject):
     """
         Defines the signals available from a running worker thread.
@@ -150,6 +154,7 @@ class MEAXtd(QMainWindow):
         self.center()
 
         self.threadpool = QThreadPool()
+        self.param_change = False
 
     def center(self):
         frame_gm = self.frameGeometry()
@@ -218,15 +223,19 @@ class MEAXtd(QMainWindow):
 
     def spike_combobox_change(self):
         self.logger.info(f"Spike method: {self.spike_method_combobox.currentText()}")
+        self.param_change = True
 
     def spike_spinbox_change(self):
         self.logger.info(f"Spike coefficient: {self.spike_coeff.value()}")
+        self.param_change = True
 
     def burst_window_spinbox_change(self):
         self.logger.info(f"Burst window: {self.burst_window_size.value()} ms")
+        self.param_change = True
 
     def burst_channels_spinbox_change(self):
         self.logger.info(f"Num channels for bursting: {self.burst_num_channels.value()}")
+        self.param_change = True
 
     def create_upper_layout(self):
         self.main_tab_upper_groupbox = QGroupBox(self.main_tab)
@@ -380,15 +389,20 @@ class MEAXtd(QMainWindow):
             self.plot.burstrbtn.setCheckable(True)
 
     def process(self):
-        worker = Worker(self.process_spikes)
-        worker.signals.finished.connect(self.configure_buttons_after_spike)
-        worker.signals.progress.connect(self.set_progress_value)
-        self.threadpool.start(worker)
+        if self.param_change:
+            self.data.clear_calculated()
+        if not self.data.spikes:
+            worker = Worker(self.process_spikes)
+            worker.signals.finished.connect(self.configure_buttons_after_spike)
+            worker.signals.progress.connect(self.set_progress_value)
+            self.threadpool.start(worker)
 
-        worker = Worker(self.process_bursts)
-        worker.signals.finished.connect(self.configure_buttons_after_burst)
-        worker.signals.progress.connect(self.set_progress_value)
-        self.threadpool.start(worker)
+            worker = Worker(self.process_bursts)
+            worker.signals.finished.connect(self.configure_buttons_after_burst)
+            worker.signals.progress.connect(self.set_progress_value)
+            self.threadpool.start(worker)
+        else:
+            self.logger.info("Spikes and bursts already found.")
 
     def create_param_groupbox(self):
         self.param_layout = QHBoxLayout(self.main_tab_param_widget)
@@ -610,7 +624,7 @@ class PlotDialog(QDialog):
                     curr_id = col_id * num_rows + row_id
                     spikes = HDF5PlotXY()
                     curr_spike_data = self.data.spike_stream[curr_id]
-                    spikes.setHDF5(self.data.time, curr_spike_data, self.data.fs, pen=pg.mkPen(color='y', width=2))
+                    spikes.setHDF5(self.data.time, curr_spike_data, self.data.fs, pen=pg.mkPen(color='k', width=2))
                     self.horizontalGroupBox.layout().itemAtPosition(col_id, row_id).widget().addItem(spikes)
 
     def add_burstlet_data(self):
