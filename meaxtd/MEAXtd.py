@@ -7,9 +7,9 @@ from meaxtd.read_h5 import read_h5_file
 from meaxtd.hdf5plot import HDF5PlotXY
 from meaxtd.find_bursts import find_spikes, find_bursts
 from meaxtd.stat_plots import raster_plot
-from PySide2.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal
-from PySide2.QtGui import QIcon, QFont
-from PySide2.QtWidgets import (QAction, QApplication, QDialog, QFileDialog, QLayout, QFrame, QSizePolicy,
+from PySide6.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal
+from PySide6.QtGui import QIcon, QFont, QAction, QScreen
+from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QLayout, QFrame, QSizePolicy,
                                QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget, QTabWidget,
                                QGroupBox, QGridLayout, QPushButton, QComboBox, QRadioButton, QPlainTextEdit,
                                QProgressBar, QDoubleSpinBox, QSpinBox)
@@ -101,11 +101,13 @@ class MEAXtd(QMainWindow):
         """Initialize the components of the main window."""
         super(MEAXtd, self).__init__(parent)
         self.setWindowTitle('MEAXtd')
-        window_icon = pkg_resources.resource_filename('meaxtd.images',
-                                                      'ic_insert_drive_file_black_48dp_1x.png')
-        self.setWindowIcon(QIcon(window_icon))
+
+        # window_icon = pkg_resources.resource_filename('meaxtd.images', 'ic_insert_drive_file_black_48dp_1x.png')
+        # self.setWindowIcon(QIcon(window_icon))
+
         self.av_width = rect.width()
         self.av_height = rect.height()
+        self.setMaximumSize(self.av_width, self.av_height)
         self.resize(int(self.av_width * 0.9), int(self.av_height * 0.75))
 
         self.menu_bar = self.menuBar()
@@ -116,12 +118,12 @@ class MEAXtd(QMainWindow):
         self.help_menu()
 
         self.central_widget = QWidget(self)
-        central_sizePolicy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        central_sizePolicy.setHorizontalStretch(0)
-        central_sizePolicy.setVerticalStretch(0)
+        central_size_policy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        central_size_policy.setHorizontalStretch(0)
+        central_size_policy.setVerticalStretch(0)
         central_flag = self.central_widget.sizePolicy().hasHeightForWidth()
-        central_sizePolicy.setHeightForWidth(central_flag)
-        self.central_widget.setSizePolicy(central_sizePolicy)
+        central_size_policy.setHeightForWidth(central_flag)
+        self.central_widget.setSizePolicy(central_size_policy)
         self.main_layout = QHBoxLayout(self.central_widget)
         self.main_layout.setSizeConstraint(QLayout.SetNoConstraint)
 
@@ -129,15 +131,20 @@ class MEAXtd(QMainWindow):
 
         self.main_tab = QWidget()
         self.main_tab_upper_layout = QVBoxLayout(self.main_tab)
-        self.create_upper_layout()
-        self.create_bottom_layout()
+        self.create_main_upper_layout()
+        self.create_main_bottom_layout()
 
         self.plot_tab = QWidget()
-        self.plot = PlotDialog()
-        self.plot_tab.layout = QVBoxLayout(self)
-        self.plot_tab.layout.addWidget(self.plot.horizontalGroupBox)
-        self.plot_tab.layout.addWidget(self.plot.buttonGroupBox)
-        self.plot_tab.setLayout(self.plot_tab.layout)
+        self.plot_tab_layout = QVBoxLayout(self.plot_tab)
+        self.create_plot_upper_layout()
+        self.create_plot_bottom_layout()
+
+
+
+
+        #self.plot = PlotDialog()
+        #self.plot_tab_layout.addWidget(self.plot.plot_groupbox)
+        #self.plot_tab_layout.addWidget(self.plot.buttonGroupBox)
 
         self.stat_tab = QWidget()
         self.stat = StatDialog()
@@ -158,8 +165,7 @@ class MEAXtd(QMainWindow):
 
     def center(self):
         frame_gm = self.frameGeometry()
-        screen = QApplication.desktop().screenNumber(QApplication.desktop().cursor().pos())
-        center_point = QApplication.desktop().screenGeometry(screen).center()
+        center_point = QScreen.availableGeometry(QApplication.primaryScreen()).center()
         frame_gm.moveCenter(center_point)
         self.move(frame_gm.topLeft())
 
@@ -204,7 +210,7 @@ class MEAXtd(QMainWindow):
             self.processqbtn.setEnabled(True)
             self.plot.set_data(self.data)
             self.stat.set_data(self.data)
-            self.plot.plot_signals()
+            self.plot.plot_signals(self.plot_grid)
 
     def set_progress_value(self, value):
         self.progressBar.setValue(value)
@@ -237,7 +243,7 @@ class MEAXtd(QMainWindow):
         self.logger.info(f"Num channels for bursting: {self.burst_num_channels.value()}")
         self.param_change = True
 
-    def create_upper_layout(self):
+    def create_main_upper_layout(self):
         self.main_tab_upper_groupbox = QGroupBox(self.main_tab)
         self.main_tab_upper_groupbox_layout = QHBoxLayout(self.main_tab_upper_groupbox)
 
@@ -412,7 +418,7 @@ class MEAXtd(QMainWindow):
         self.param_groupbox.setFont(self.gbox_font)
         self.param_layout.addWidget(self.param_groupbox)
 
-    def create_bottom_layout(self):
+    def create_main_bottom_layout(self):
         self.main_tab_bottom_groupbox = QGroupBox(self.main_tab)
         self.main_tab_bottom_groupbox.setFont(self.gbox_font)
         self.log_groupbox_layout = QVBoxLayout(self.main_tab_bottom_groupbox)
@@ -447,6 +453,28 @@ class MEAXtd(QMainWindow):
         self.log_window.appendPlainText(log_text)
         self.log_window.centerCursor()
 
+    def create_plot_upper_layout(self):
+        self.plot_groupbox = QGroupBox(self.plot_tab)
+        size_policy_plot = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        size_policy_plot.setHorizontalStretch(0)
+        size_policy_plot.setVerticalStretch(4)
+        size_policy_plot_flag = self.plot_groupbox.sizePolicy().hasHeightForWidth()
+        size_policy_plot.setHeightForWidth(size_policy_plot_flag)
+        self.plot_groupbox.setSizePolicy(size_policy_plot)
+        self.plot_grid = QGridLayout(self.plot_groupbox)
+        self.plot = PlotDialog(self.plot_grid)
+        self.plot_tab_layout.addWidget(self.plot_groupbox)
+
+    def create_plot_bottom_layout(self):
+        self.plot_bot_groupbox = QGroupBox(self.plot_tab)
+        size_policy_bot_groupbox = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        size_policy_bot_groupbox.setHorizontalStretch(0)
+        size_policy_bot_groupbox.setVerticalStretch(1)
+        size_policy_bot_groupbox_flag = self.plot_bot_groupbox.sizePolicy().hasHeightForWidth()
+        size_policy_bot_groupbox.setHeightForWidth(size_policy_bot_groupbox_flag)
+        self.plot_bot_groupbox.setSizePolicy(size_policy_bot_groupbox)
+        self.plot_tab_layout.addWidget(self.plot_bot_groupbox)
+
 
 class AboutDialog(QDialog):
     """Create the necessary elements to show helpful text in a dialog."""
@@ -456,9 +484,8 @@ class AboutDialog(QDialog):
         super(AboutDialog, self).__init__(parent)
 
         self.setWindowTitle('About')
-        help_icon = pkg_resources.resource_filename('meaxtd.images',
-                                                    'ic_help_black_48dp_1x.png')
-        self.setWindowIcon(QIcon(help_icon))
+        # help_icon = pkg_resources.resource_filename('meaxtd.images', 'ic_help_black_48dp_1x.png')
+        # self.setWindowIcon(QIcon(help_icon))
         self.resize(300, 200)
 
         author = QLabel('Aaron Blare')
@@ -482,29 +509,28 @@ class AboutDialog(QDialog):
 
 class PlotDialog(QDialog):
 
-    def __init__(self, data=None):
+    def __init__(self, plot_grid, data=None):
         super().__init__()
         self.data = data
-        self.init_ui()
+        self.init_ui(plot_grid)
 
     def set_data(self, data):
         self.data = data
 
-    def init_ui(self):
-        self.create_grid_layout()
-        self.create_button_layout()
+    def init_ui(self, plot_grid):
+        self.fill_grid_layout(plot_grid)
+        #self.create_button_layout()
 
-    def create_grid_layout(self):
-        self.horizontalGroupBox = QGroupBox()
-        layout = QGridLayout()
-
+    def fill_grid_layout(self, plot_grid):
         num_rows = 10
         num_columns = 6
 
         plots = []
 
         for row_id in range(0, num_rows):
-            layout.setColumnStretch(row_id, num_columns)
+            plot_grid.setColumnStretch(row_id, num_columns)
+        for column_id in range(0, num_columns):
+            plot_grid.setRowStretch(column_id, num_rows)
 
         for col_id in range(0, num_columns):
             for row_id in range(0, num_rows):
@@ -521,13 +547,11 @@ class PlotDialog(QDialog):
                     curr_time = self.data.time
                     curve.setHDF5(curr_time, curr_data, self.data.fs)
                     curr_plot.addItem(curve)
-                layout.addWidget(curr_plot, col_id, row_id)
+                plot_grid.addWidget(curr_plot, col_id, row_id)
                 plots.append(curr_plot)
                 if curr_id > 0:
                     plots[curr_id - 1].getViewBox().setXLink(plots[curr_id])
                     plots[curr_id - 1].getViewBox().setYLink(plots[curr_id])
-
-        self.horizontalGroupBox.setLayout(layout)
 
     def create_button_layout(self):
         self.buttonGroupBox = QGroupBox()
@@ -579,7 +603,7 @@ class PlotDialog(QDialog):
         buttonLayout.addStretch()
         self.buttonGroupBox.setLayout(buttonLayout)
 
-    def plot_signals(self):
+    def plot_signals(self, plot_grid):
         num_rows = 10
         num_columns = 6
         for col_id in range(0, num_columns):
@@ -588,7 +612,7 @@ class PlotDialog(QDialog):
                 curve = HDF5PlotXY()
                 curr_data = self.data.stream[:, curr_id]
                 curve.setHDF5(self.data.time, curr_data, self.data.fs)
-                self.horizontalGroupBox.layout().itemAtPosition(col_id, row_id).widget().addItem(curve)
+                plot_grid.layout().itemAtPosition(col_id, row_id).widget().addItem(curve)
 
     def remove_data(self):
         if self.signalrbtn.isChecked():
@@ -603,15 +627,15 @@ class PlotDialog(QDialog):
             self.burstlet_id = None
         if getattr(self, 'burst_id', None) is not None:
             self.burst_id = None
-        curr_curves = self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().plotItem.curves
+        curr_curves = self.plot_groupbox.layout().itemAtPosition(0, 0).widget().plotItem.curves
         if len(curr_curves) > 1:
             num_rows = 10
             num_columns = 6
             for curve_id in range(len(curr_curves) - 1, 0, -1):
                 for col_id in range(0, num_columns):
                     for row_id in range(0, num_rows):
-                        curr_plot_item = self.horizontalGroupBox.layout().itemAtPosition(col_id,
-                                                                                         row_id).widget().plotItem
+                        curr_plot_item = self.plot_groupbox.layout().itemAtPosition(col_id,
+                                                                                    row_id).widget().plotItem
                         curr_plot_item.removeItem(curr_plot_item.curves[curve_id])
 
     def add_spike_data(self):
@@ -625,7 +649,7 @@ class PlotDialog(QDialog):
                     spikes = HDF5PlotXY()
                     curr_spike_data = self.data.spike_stream[curr_id]
                     spikes.setHDF5(self.data.time, curr_spike_data, self.data.fs, pen=pg.mkPen(color='k', width=2))
-                    self.horizontalGroupBox.layout().itemAtPosition(col_id, row_id).widget().addItem(spikes)
+                    self.plot_groupbox.layout().itemAtPosition(col_id, row_id).widget().addItem(spikes)
 
     def add_burstlet_data(self):
         if self.burstletrbtn.isChecked():
@@ -639,7 +663,7 @@ class PlotDialog(QDialog):
                     curr_burstlet_data = self.data.burstlet_stream[curr_id]
                     burstlets.setHDF5(self.data.time, curr_burstlet_data, self.data.fs,
                                       pen=pg.mkPen(color='g', width=2))
-                    self.horizontalGroupBox.layout().itemAtPosition(col_id, row_id).widget().addItem(burstlets)
+                    self.plot_groupbox.layout().itemAtPosition(col_id, row_id).widget().addItem(burstlets)
 
     def add_burst_data(self):
         if self.burstrbtn.isChecked():
@@ -653,12 +677,12 @@ class PlotDialog(QDialog):
                     curr_burst_data = self.data.burst_stream[curr_id]
                     bursts.setHDF5(self.data.time, curr_burst_data, self.data.fs,
                                    pen=pg.mkPen(color='b', width=2))
-                    self.horizontalGroupBox.layout().itemAtPosition(col_id, row_id).widget().addItem(bursts)
+                    self.plot_groupbox.layout().itemAtPosition(col_id, row_id).widget().addItem(bursts)
                     bursts_borders = HDF5PlotXY()
                     curr_burst_borders = self.data.burst_borders[curr_id]
                     bursts_borders.setHDF5(self.data.time, curr_burst_borders, self.data.fs,
                                            pen=pg.mkPen(color='r', width=1.5))
-                    self.horizontalGroupBox.layout().itemAtPosition(col_id, row_id).widget().addItem(bursts_borders)
+                    self.plot_groupbox.layout().itemAtPosition(col_id, row_id).widget().addItem(bursts_borders)
 
     def change_range_forward(self):
         if self.spikerbtn.isChecked():
@@ -671,11 +695,11 @@ class PlotDialog(QDialog):
                 self.spike_id += 1
             left_border = max(0, self.data.time[curr_spike] - 0.5)
             right_border = min(len(self.data.time), self.data.time[curr_spike] + 0.5)
-            self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
+            self.plot_groupbox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
             if curr_spike_amplitude > 0.004:
                 top_border = max(0.002, curr_spike_amplitude / 2 + 0.0001)
                 bottom_border = min(-0.002, curr_spike_amplitude / 2 - 0.0001)
-                self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
+                self.plot_groupbox.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
         if self.burstletrbtn.isChecked():
             if getattr(self, 'burstlet_id', None) is None:
                 self.burstlet_id = 0
@@ -692,12 +716,12 @@ class PlotDialog(QDialog):
             else:
                 left_border = self.data.time[curr_burstlet_start] - (1 - curr_burstlet_len) / 2
                 right_border = self.data.time[curr_burstlet_end] + (1 - curr_burstlet_len) / 2
-            self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
+            self.plot_groupbox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
             curr_burstlet_amplitude = self.data.burstlets_amplitudes[curr_signal][self.burstlet_id]
             if curr_burstlet_amplitude > 0.004:
                 top_border = max(0.002, curr_burstlet_amplitude / 2 + 0.0001)
                 bottom_border = min(-0.002, curr_burstlet_amplitude / 2 - 0.0001)
-                self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
+                self.plot_groupbox.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
         if self.burstrbtn.isChecked():
             if getattr(self, 'burst_id', None) is None:
                 self.burst_id = 0
@@ -713,7 +737,7 @@ class PlotDialog(QDialog):
             else:
                 left_border = self.data.time[curr_burst_start] - (1 - curr_burst_len) / 2
                 right_border = self.data.time[curr_burst_end] + (1 - curr_burst_len) / 2
-            self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
+            self.plot_groupbox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
 
     def change_range_backward(self):
         if self.spikerbtn.isChecked():
@@ -726,11 +750,11 @@ class PlotDialog(QDialog):
                 self.spike_id -= 1
             left_border = max(0, self.data.time[curr_spike] - 0.5)
             right_border = min(len(self.data.time), self.data.time[curr_spike] + 0.5)
-            self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
+            self.plot_groupbox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
             if curr_spike_amplitude > 0.004:
                 top_border = max(0.002, curr_spike_amplitude / 2 + 0.0001)
                 bottom_border = min(-0.002, curr_spike_amplitude / 2 - 0.0001)
-                self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
+                self.plot_groupbox.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
         if self.burstletrbtn.isChecked():
             if getattr(self, 'burstlet_id', None) is None:
                 self.burstlet_id = 0
@@ -747,12 +771,12 @@ class PlotDialog(QDialog):
             else:
                 left_border = self.data.time[curr_burstlet_start] - (1 - curr_burstlet_len) / 2
                 right_border = self.data.time[curr_burstlet_end] + (1 - curr_burstlet_len) / 2
-            self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
+            self.plot_groupbox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
             curr_burstlet_amplitude = self.data.burstlets_amplitudes[curr_signal][self.burstlet_id]
             if curr_burstlet_amplitude > 0.004:
                 top_border = max(0.002, curr_burstlet_amplitude / 2 + 0.0001)
                 bottom_border = min(-0.002, curr_burstlet_amplitude / 2 - 0.0001)
-                self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
+                self.plot_groupbox.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
         if self.burstrbtn.isChecked():
             if getattr(self, 'burst_id', None) is None:
                 self.burst_id = 0
@@ -768,7 +792,7 @@ class PlotDialog(QDialog):
             else:
                 left_border = self.data.time[curr_burst_start] - (1 - curr_burst_len) / 2
                 right_border = self.data.time[curr_burst_end] + (1 - curr_burst_len) / 2
-            self.horizontalGroupBox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
+            self.plot_groupbox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
 
 
 class StatDialog(QDialog):
