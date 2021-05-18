@@ -373,9 +373,9 @@ class MEAXtd(QMainWindow):
     def configure_buttons_after_spike(self):
         if self.data.spikes:
             self.logger.info("Spikes found.")
-            self.plot.signalrbtn.setCheckable(True)
-            self.plot.signalrbtn.setChecked(True)
-            self.plot.spikerbtn.setCheckable(True)
+            self.highlight_none_rb.setCheckable(True)
+            self.highlight_none_rb.setChecked(True)
+            self.highlight_spike_rb.setCheckable(True)
             self.stat.plot_raster()
 
     def process_bursts(self, progress_callback):
@@ -388,11 +388,11 @@ class MEAXtd(QMainWindow):
     def configure_buttons_after_burst(self):
         if self.data.bursts:
             self.logger.info("Bursts found.")
-            self.plot.signalrbtn.setCheckable(True)
-            self.plot.signalrbtn.setChecked(True)
-            self.plot.spikerbtn.setCheckable(True)
-            self.plot.burstletrbtn.setCheckable(True)
-            self.plot.burstrbtn.setCheckable(True)
+            self.highlight_none_rb.setCheckable(True)
+            self.highlight_none_rb.setChecked(True)
+            self.highlight_spike_rb.setCheckable(True)
+            self.highlight_burstlet_rb.setCheckable(True)
+            self.highlight_burst_rb.setCheckable(True)
 
     def process(self):
         if self.param_change:
@@ -476,6 +476,7 @@ class MEAXtd(QMainWindow):
 
         self.plot_bottom_layout = QHBoxLayout(self.plot_bot_groupbox)
 
+        # Groupbox for highlighting elements (spikes, bursts, etc.)
         self.plot_highlight_groupbox = QGroupBox(self.plot_bot_groupbox, title="Highlight")
         size_policy_highlight = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         size_policy_highlight.setHorizontalStretch(1)
@@ -489,19 +490,26 @@ class MEAXtd(QMainWindow):
         self.plot_highlight_grid.setContentsMargins(50, -1, 50, -1)
 
         self.highlight_none_rb = QRadioButton(self.plot_highlight_groupbox, text="None")
+        self.highlight_none_rb.toggled.connect(lambda: self.plot.remove_data())
         self.plot_highlight_grid.addWidget(self.highlight_none_rb, 0, 0, 1, 1)
-
         self.highlight_spike_rb = QRadioButton(self.plot_highlight_groupbox, text="Spikes")
+        self.highlight_spike_rb.toggled.connect(lambda: self.plot.add_spike_data())
         self.plot_highlight_grid.addWidget(self.highlight_spike_rb, 1, 0, 1, 1)
-
         self.highlight_burstlet_rb = QRadioButton(self.plot_highlight_groupbox, text="Burstlets")
+        self.highlight_burstlet_rb.toggled.connect(lambda: self.plot.add_burstlet_data())
         self.plot_highlight_grid.addWidget(self.highlight_burstlet_rb, 1, 1, 1, 1)
-
         self.highlight_burst_rb = QRadioButton(self.plot_highlight_groupbox, text="Bursts")
+        self.highlight_burst_rb.toggled.connect(lambda: self.plot.add_burst_data())
         self.plot_highlight_grid.addWidget(self.highlight_burst_rb, 0, 1, 1, 1)
+        if not hasattr(self, 'data'):
+            self.highlight_none_rb.setCheckable(False)
+            self.highlight_spike_rb.setCheckable(False)
+            self.highlight_burstlet_rb.setCheckable(False)
+            self.highlight_burst_rb.setCheckable(False)
 
         self.plot_bottom_layout.addWidget(self.plot_highlight_groupbox)
 
+        # Navigation groupbox
         self.plot_navigation_groupbox = QGroupBox(self.plot_bot_groupbox, title="Navigation")
         size_policy_navigation = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         size_policy_navigation.setHorizontalStretch(2)
@@ -531,8 +539,16 @@ class MEAXtd(QMainWindow):
         self.plot_navigation_button_layout = QHBoxLayout(self.plot_navigation_button_frame)
         self.plot_navigation_button_layout.setContentsMargins(30, 20, 30, 9)
         self.plot_navigation_back_button = QPushButton(self.plot_navigation_button_frame, text="<")
+        self.plot_navigation_back_button.setEnabled(True)
+        if self.highlight_none_rb.isChecked():
+            self.plot_navigation_back_button.setEnabled(False)
+        self.plot_navigation_back_button.clicked.connect(lambda: self.plot.change_range_backward())
         self.plot_navigation_button_layout.addWidget(self.plot_navigation_back_button)
         self.plot_navigation_next_button = QPushButton(self.plot_navigation_button_frame, text=">")
+        self.plot_navigation_next_button.setEnabled(True)
+        if self.highlight_none_rb.isChecked():
+            self.plot_navigation_next_button.setEnabled(False)
+        self.plot_navigation_next_button.clicked.connect(lambda: self.plot.change_range_forward())
         self.plot_navigation_button_layout.addWidget(self.plot_navigation_next_button)
         self.plot_navigation_layout.addWidget(self.plot_navigation_button_frame)
 
@@ -593,7 +609,6 @@ class PlotDialog(QDialog):
 
     def init_ui(self, plot_grid):
         self.fill_grid_layout(plot_grid)
-        #self.create_button_layout()
 
     def fill_grid_layout(self, plot_grid):
         num_rows = 10
@@ -626,56 +641,6 @@ class PlotDialog(QDialog):
                 if curr_id > 0:
                     plots[curr_id - 1].getViewBox().setXLink(plots[curr_id])
                     plots[curr_id - 1].getViewBox().setYLink(plots[curr_id])
-
-    def create_button_layout(self):
-        self.buttonGroupBox = QGroupBox()
-        buttonLayout = QHBoxLayout()
-        buttonLayout.addStretch()
-
-        self.signalrbtn = QRadioButton('Signal')
-        self.signalrbtn.setChecked(True)
-        self.signalrbtn.toggled.connect(lambda: self.remove_data())
-        buttonLayout.addWidget(self.signalrbtn)
-
-        self.spikerbtn = QRadioButton('Spike')
-        self.spikerbtn.toggled.connect(lambda: self.add_spike_data())
-        buttonLayout.addWidget(self.spikerbtn)
-
-        self.burstletrbtn = QRadioButton('Burstlet')
-        self.burstletrbtn.toggled.connect(lambda: self.add_burstlet_data())
-        buttonLayout.addWidget(self.burstletrbtn)
-
-        self.burstrbtn = QRadioButton('Burst')
-        self.burstrbtn.toggled.connect(lambda: self.add_burst_data())
-        buttonLayout.addWidget(self.burstrbtn)
-
-        if not self.data:
-            self.signalrbtn.setCheckable(False)
-            self.spikerbtn.setCheckable(False)
-            self.burstletrbtn.setCheckable(False)
-            self.burstrbtn.setCheckable(False)
-
-        self.signalComboBox = QComboBox()
-        signal_numbers = list(range(1, 61))
-        self.signalComboBox.addItems([str(num) for num in signal_numbers])
-        buttonLayout.addWidget(self.signalComboBox)
-
-        self.prevqbtn = QPushButton('<', self)
-        self.prevqbtn.setEnabled(True)
-        if self.signalrbtn.isChecked():
-            self.prevqbtn.setEnabled(False)
-        buttonLayout.addWidget(self.prevqbtn)
-        self.prevqbtn.clicked.connect(lambda: self.change_range_backward())
-
-        self.nextqbtn = QPushButton('>', self)
-        self.nextqbtn.setEnabled(True)
-        if self.signalrbtn.isChecked():
-            self.nextqbtn.setEnabled(False)
-        buttonLayout.addWidget(self.nextqbtn)
-        self.nextqbtn.clicked.connect(lambda: self.change_range_forward())
-
-        buttonLayout.addStretch()
-        self.buttonGroupBox.setLayout(buttonLayout)
 
     def plot_signals(self, plot_grid):
         num_rows = 10
