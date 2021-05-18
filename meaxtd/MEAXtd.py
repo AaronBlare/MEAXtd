@@ -457,7 +457,7 @@ class MEAXtd(QMainWindow):
         self.plot_groupbox = QGroupBox(self.plot_tab)
         size_policy_plot = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         size_policy_plot.setHorizontalStretch(0)
-        size_policy_plot.setVerticalStretch(4)
+        size_policy_plot.setVerticalStretch(5)
         size_policy_plot_flag = self.plot_groupbox.sizePolicy().hasHeightForWidth()
         size_policy_plot.setHeightForWidth(size_policy_plot_flag)
         self.plot_groupbox.setSizePolicy(size_policy_plot)
@@ -473,6 +473,80 @@ class MEAXtd(QMainWindow):
         size_policy_bot_groupbox_flag = self.plot_bot_groupbox.sizePolicy().hasHeightForWidth()
         size_policy_bot_groupbox.setHeightForWidth(size_policy_bot_groupbox_flag)
         self.plot_bot_groupbox.setSizePolicy(size_policy_bot_groupbox)
+
+        self.plot_bottom_layout = QHBoxLayout(self.plot_bot_groupbox)
+
+        self.plot_highlight_groupbox = QGroupBox(self.plot_bot_groupbox, title="Highlight")
+        size_policy_highlight = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        size_policy_highlight.setHorizontalStretch(1)
+        size_policy_highlight.setVerticalStretch(0)
+        size_policy_highlight_flag = self.plot_highlight_groupbox.sizePolicy().hasHeightForWidth()
+        size_policy_highlight.setHeightForWidth(size_policy_highlight_flag)
+        self.plot_highlight_groupbox.setSizePolicy(size_policy_highlight)
+        self.plot_highlight_groupbox.setFont(self.gbox_font)
+
+        self.plot_highlight_grid = QGridLayout(self.plot_highlight_groupbox)
+        self.plot_highlight_grid.setContentsMargins(50, -1, 50, -1)
+
+        self.highlight_none_rb = QRadioButton(self.plot_highlight_groupbox, text="None")
+        self.plot_highlight_grid.addWidget(self.highlight_none_rb, 0, 0, 1, 1)
+
+        self.highlight_spike_rb = QRadioButton(self.plot_highlight_groupbox, text="Spikes")
+        self.plot_highlight_grid.addWidget(self.highlight_spike_rb, 1, 0, 1, 1)
+
+        self.highlight_burstlet_rb = QRadioButton(self.plot_highlight_groupbox, text="Burstlets")
+        self.plot_highlight_grid.addWidget(self.highlight_burstlet_rb, 1, 1, 1, 1)
+
+        self.highlight_burst_rb = QRadioButton(self.plot_highlight_groupbox, text="Bursts")
+        self.plot_highlight_grid.addWidget(self.highlight_burst_rb, 0, 1, 1, 1)
+
+        self.plot_bottom_layout.addWidget(self.plot_highlight_groupbox)
+
+        self.plot_navigation_groupbox = QGroupBox(self.plot_bot_groupbox, title="Navigation")
+        size_policy_navigation = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        size_policy_navigation.setHorizontalStretch(2)
+        size_policy_navigation.setVerticalStretch(0)
+        size_policy_navigation_flag = self.plot_navigation_groupbox.sizePolicy().hasHeightForWidth()
+        size_policy_navigation.setHeightForWidth(size_policy_navigation_flag)
+        self.plot_navigation_groupbox.setSizePolicy(size_policy_navigation)
+        self.plot_navigation_groupbox.setFont(self.gbox_font)
+
+        self.plot_navigation_layout = QHBoxLayout(self.plot_navigation_groupbox)
+
+        self.plot_channel_frame = QFrame(self.plot_navigation_groupbox)
+        self.plot_channel_frame.setAutoFillBackground(False)
+        self.plot_channel_frame.setFrameShape(QFrame.NoFrame)
+        self.plot_channel_frame.setFrameShadow(QFrame.Raised)
+        self.plot_channel_frame_layout = QVBoxLayout(self.plot_channel_frame)
+        self.plot_channel_frame_layout.setContentsMargins(80, -1, 80, -1)
+        self.plot_channel_label = QLabel(self.plot_channel_frame, text="# Channel")
+        self.plot_channel_frame_layout.addWidget(self.plot_channel_label)
+        self.plot_channel_combobox = QComboBox(self.plot_channel_frame)
+        signal_numbers = list(range(1, 61))
+        self.plot_channel_combobox.addItems([str(num) for num in signal_numbers])
+        self.plot_channel_frame_layout.addWidget(self.plot_channel_combobox)
+        self.plot_navigation_layout.addWidget(self.plot_channel_frame)
+
+        self.plot_navigation_button_frame = QFrame(self.plot_navigation_groupbox)
+        self.plot_navigation_button_layout = QHBoxLayout(self.plot_navigation_button_frame)
+        self.plot_navigation_button_layout.setContentsMargins(30, 20, 30, 9)
+        self.plot_navigation_back_button = QPushButton(self.plot_navigation_button_frame, text="<")
+        self.plot_navigation_button_layout.addWidget(self.plot_navigation_back_button)
+        self.plot_navigation_next_button = QPushButton(self.plot_navigation_button_frame, text=">")
+        self.plot_navigation_button_layout.addWidget(self.plot_navigation_next_button)
+        self.plot_navigation_layout.addWidget(self.plot_navigation_button_frame)
+
+        self.plot_item_frame = QFrame(self.plot_navigation_groupbox)
+        self.plot_item_layout = QVBoxLayout(self.plot_item_frame)
+        self.plot_item_layout.setContentsMargins(80, -1, 80, -1)
+        self.plot_item_label = QLabel(self.plot_item_frame, text="# Item")
+        self.plot_item_layout.addWidget(self.plot_item_label)
+        self.plot_item_spinbox = QSpinBox(self.plot_item_frame)
+        self.plot_item_layout.addWidget(self.plot_item_spinbox)
+        self.plot_navigation_layout.addWidget(self.plot_item_frame)
+
+        self.plot_bottom_layout.addWidget(self.plot_navigation_groupbox)
+
         self.plot_tab_layout.addWidget(self.plot_bot_groupbox)
 
 
