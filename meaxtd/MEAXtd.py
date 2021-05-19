@@ -559,7 +559,7 @@ class MEAXtd(QMainWindow):
         self.plot_item_layout.setContentsMargins(80, -1, 80, -1)
         self.plot_item_label = QLabel(self.plot_item_frame, text="# Item")
         self.plot_item_layout.addWidget(self.plot_item_label)
-        self.plot_item_spinbox = QSpinBox(self.plot_item_frame)
+        self.plot_item_spinbox = QLabel(self.plot_item_frame, text="1")
         self.plot_item_layout.addWidget(self.plot_item_spinbox)
         self.plot_navigation_layout.addWidget(self.plot_item_frame)
 
@@ -602,11 +602,11 @@ class MEAXtd(QMainWindow):
         signal_id = int(self.plot_channel_combobox.currentText())
         self.plot.change_range_next(self.plot_grid, data_type, signal_id)
         if data_type == 'spike':
-            self.plot_item_spinbox.setValue(self.plot.spike_id + 1)
+            self.plot_item_spinbox.setText(str(self.plot.spike_id + 1))
         if data_type == 'burstlet':
-            self.plot_item_spinbox.setValue(self.plot.burstlet_id + 1)
+            self.plot_item_spinbox.setText(str(self.plot.burstlet_id + 1))
         if data_type == 'burst':
-            self.plot_item_spinbox.setValue(self.plot.burst_id + 1)
+            self.plot_item_spinbox.setText(str(self.plot.burst_id + 1))
 
     def change_plot_range_prev(self):
         if self.highlight_spike_rb.isChecked():
@@ -618,11 +618,11 @@ class MEAXtd(QMainWindow):
         signal_id = int(self.plot_channel_combobox.currentText())
         self.plot.change_range_prev(self.plot_grid, data_type, signal_id)
         if data_type == 'spike':
-            self.plot_item_spinbox.setValue(self.plot.spike_id + 1)
+            self.plot_item_spinbox.setText(str(self.plot.spike_id + 1))
         if data_type == 'burstlet':
-            self.plot_item_spinbox.setValue(self.plot.burstlet_id + 1)
+            self.plot_item_spinbox.setText(str(self.plot.burstlet_id + 1))
         if data_type == 'burst':
-            self.plot_item_spinbox.setValue(self.plot.burst_id + 1)
+            self.plot_item_spinbox.setText(str(self.plot.burst_id + 1))
 
 
 class AboutDialog(QDialog):
