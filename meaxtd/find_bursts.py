@@ -5,6 +5,9 @@ from intervaltree import IntervalTree
 def find_spikes(data, method, coefficient, progress_callback):
     signals = data.stream
     num_signals = signals.shape[1]
+    total_time_in_ms = int(np.ceil(data.time[-1] * 1000))
+    data.TSR = np.zeros(int(total_time_in_ms / 50), dtype=int)
+    data.TSR_times = np.arange(0, data.time[-1], 0.05)
     for signal_id in range(0, num_signals):
         progress_callback.emit(round(signal_id * 40 / num_signals))
         if method == 'Median':
@@ -30,6 +33,8 @@ def find_spikes(data, method, coefficient, progress_callback):
         data.spike_stream[signal_id] = np.empty(len(signals[:, signal_id]))
         data.spike_stream[signal_id][:] = np.nan
         for peak_id in range(0, len(spikes)):
+            TSR_index = int(np.ceil(spikes[peak_id] / 500))
+            data.TSR[TSR_index - 1] += 1
             for curr_id in range(crossings[peak_id], spikes_ends[peak_id] + 1):
                 data.spike_stream[signal_id][curr_id] = signals[curr_id, signal_id]
 

@@ -18,5 +18,12 @@ def raster_plot(data):
             nodes[node_id, 0] = data.time[curr_spike]
             nodes[node_id, 1] = signal_id + 1
             node_id += 1
-    g.setData(pos=nodes, adj=edges, symbolPen=pg.mkPen('w', width=1))
+    g.setData(pos=nodes, adj=edges, symbolBrush=pg.mkBrush('k'), size=2)
     return g
+
+
+def tsr_plot(data):
+    curve = pg.PlotCurveItem()
+    curr_data = data.TSR
+    curve.setData(x=data.TSR_times, y=curr_data, pen=pg.mkPen('k'))
+    return curve

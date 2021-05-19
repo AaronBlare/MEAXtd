@@ -6,7 +6,7 @@ import logging
 from meaxtd.read_h5 import read_h5_file
 from meaxtd.hdf5plot import HDF5PlotXY
 from meaxtd.find_bursts import find_spikes, find_bursts
-from meaxtd.stat_plots import raster_plot
+from meaxtd.stat_plots import raster_plot, tsr_plot
 from PySide6.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal
 from PySide6.QtGui import QIcon, QFont, QAction, QScreen
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QLayout, QFrame, QSizePolicy,
@@ -139,14 +139,12 @@ class MEAXtd(QMainWindow):
         self.create_plot_bottom_layout()
 
         self.stat_tab = QWidget()
-        self.stat = StatDialog()
-        self.stat_tab.layout = QVBoxLayout(self)
-        self.stat_tab.layout.addWidget(self.stat.horizontalGroupBox)
-        self.stat_tab.setLayout(self.stat_tab.layout)
+        self.stat_tab_layout = QHBoxLayout(self.stat_tab)
+        self.create_stat_layout()
 
         self.tabs.addTab(self.main_tab, "Main")
-        self.tabs.addTab(self.plot_tab, "Plot")
-        self.tabs.addTab(self.stat_tab, "Stat")
+        self.tabs.addTab(self.plot_tab, "Signal")
+        self.tabs.addTab(self.stat_tab, "Plots")
 
         self.main_layout.addWidget(self.tabs)
         self.setCentralWidget(self.central_widget)
@@ -369,7 +367,8 @@ class MEAXtd(QMainWindow):
             self.highlight_none_rb.setCheckable(True)
             self.highlight_none_rb.setChecked(True)
             self.highlight_spike_rb.setCheckable(True)
-            self.stat.plot_raster()
+            self.stat.plot_raster(self.stat_left_groupbox_layout)
+            self.stat.plot_tsr(self.stat_left_groupbox_layout)
 
     def process_bursts(self, progress_callback):
         spike_method = self.spike_method_combobox.currentText()
@@ -633,6 +632,29 @@ class MEAXtd(QMainWindow):
         if data_type == 'burst':
             self.plot_item_spinbox.setText(str(self.plot.burst_id))
 
+    def create_stat_layout(self):
+        self.stat_left_groupbox = QGroupBox(self.stat_tab)
+        size_policy_stat_left = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        size_policy_stat_left.setHorizontalStretch(4)
+        size_policy_stat_left.setHorizontalStretch(0)
+        size_policy_stat_left_flag = self.stat_left_groupbox.sizePolicy().hasHeightForWidth()
+        size_policy_stat_left.setHeightForWidth(size_policy_stat_left_flag)
+        self.stat_left_groupbox.setSizePolicy(size_policy_stat_left)
+        self.stat_left_groupbox_layout = QGridLayout(self.stat_left_groupbox)
+        self.stat_tab_layout.addWidget(self.stat_left_groupbox)
+
+        self.stat_right_groupbox = QGroupBox(self.stat_tab)
+        size_policy_stat_right = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        size_policy_stat_right.setHorizontalStretch(1)
+        size_policy_stat_right.setHorizontalStretch(0)
+        size_policy_stat_right_flag = self.stat_right_groupbox.sizePolicy().hasHeightForWidth()
+        size_policy_stat_right.setHeightForWidth(size_policy_stat_right_flag)
+        self.stat_right_groupbox.setSizePolicy(size_policy_stat_right)
+        self.stat_right_groupbox_layout = QGridLayout(self.stat_right_groupbox)
+        self.stat_tab_layout.addWidget(self.stat_right_groupbox)
+
+        self.stat = StatDialog(self.stat_left_groupbox_layout, self.stat_right_groupbox_layout)
+
 
 class AboutDialog(QDialog):
     """Create the necessary elements to show helpful text in a dialog."""
@@ -891,55 +913,54 @@ class PlotDialog(QDialog):
 
 class StatDialog(QDialog):
 
-    def __init__(self, data=None):
+    def __init__(self, left_layout, right_layout, data=None):
         super().__init__()
         self.data = data
-        self.init_ui()
+        self.init_ui(left_layout)
 
     def set_data(self, data):
         self.data = data
 
-    def init_ui(self):
-        self.create_plot_layout()
+    def init_ui(self, left_layout):
+        self.configure_left(left_layout)
 
-    def create_plot_layout(self):
-        self.horizontalGroupBox = QGroupBox()
-        layout = QGridLayout()
+    def configure_left(self, left_layout):
 
-        num_rows = 1
-        num_columns = 1
-
-        plots = []
-
-        for row_id in range(0, num_rows):
-            layout.setColumnStretch(row_id, num_columns)
-
-        for col_id in range(0, num_columns):
-            for row_id in range(0, num_rows):
-                curr_id = col_id * num_rows + row_id
-                curr_plot = pg.PlotWidget()
-                curr_plot.enableAutoRange(False, False)
-                curr_plot.setXRange(0, 60)
-                curr_plot.setYRange(0, 60.5)
-                curr_plot.setLabel('left', 'Electrode')
-                curr_plot.setLabel('bottom', 'Time (s)')
-                curr_plot.setLimits(yMin=-1, yMax=62, minYRange=1)
-                if self.data:
-                    if self.data.spikes:
-                        rplot = raster_plot(self.data)
-                        curr_plot.addItem(rplot)
-                layout.addWidget(curr_plot, col_id, row_id)
-                plots.append(curr_plot)
-
-        self.horizontalGroupBox.setLayout(layout)
-
-    def plot_raster(self):
-        num_rows = 1
-        num_columns = 1
-        for col_id in range(0, num_columns):
-            for row_id in range(0, num_rows):
+        r_plot = pg.PlotWidget()
+        r_plot.enableAutoRange(False, False)
+        r_plot.setXRange(0, 60)
+        r_plot.setYRange(0, 60.5)
+        r_plot.setLabel('left', 'Electrode')
+        r_plot.setLabel('bottom', 'Time (s)')
+        r_plot.setLimits(yMin=-1, yMax=62, minYRange=1)
+        if self.data:
+            if self.data.spikes:
                 rplot = raster_plot(self.data)
-                self.horizontalGroupBox.layout().itemAtPosition(col_id, row_id).widget().addItem(rplot)
+                r_plot.addItem(rplot)
+        left_layout.addWidget(r_plot, 0, 0)
+
+        t_plot = pg.PlotWidget()
+        t_plot.enableAutoRange(False, False)
+        t_plot.setXRange(0, 60)
+        r_plot.setYRange(0, 500)
+        t_plot.setLabel('left', 'TSR, spikes per bin')
+        t_plot.setLabel('bottom', 'Time (s)')
+        t_plot.setLimits(yMin=-1, yMax=500, minYRange=1)
+        if self.data:
+            if self.data.spikes:
+                tplot = tsr_plot(self.data)
+                t_plot.addItem(tplot)
+        t_plot.getViewBox().setXLink(r_plot)
+        left_layout.addWidget(t_plot, 1, 0)
+
+    def plot_raster(self, left_layout):
+        rplot = raster_plot(self.data)
+        left_layout.layout().itemAtPosition(0, 0).widget().addItem(rplot)
+
+    def plot_tsr(self, left_layout):
+        tplot = tsr_plot(self.data)
+        left_layout.layout().itemAtPosition(1, 0).widget().setLimits(yMin=-1, yMax=max(self.data.TSR) + 1)
+        left_layout.layout().itemAtPosition(1, 0).widget().addItem(tplot)
 
 
 def main(args=sys.argv):
