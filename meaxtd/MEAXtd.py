@@ -14,7 +14,6 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QLayout, QFra
                                QGroupBox, QGridLayout, QPushButton, QComboBox, QRadioButton, QPlainTextEdit,
                                QProgressBar, QDoubleSpinBox, QSpinBox)
 
-
 pg.setConfigOption('background', 'w')
 pg.setConfigOption('foreground', 'k')
 
@@ -139,13 +138,6 @@ class MEAXtd(QMainWindow):
         self.create_plot_upper_layout()
         self.create_plot_bottom_layout()
 
-
-
-
-        #self.plot = PlotDialog()
-        #self.plot_tab_layout.addWidget(self.plot.plot_groupbox)
-        #self.plot_tab_layout.addWidget(self.plot.buttonGroupBox)
-
         self.stat_tab = QWidget()
         self.stat = StatDialog()
         self.stat_tab.layout = QVBoxLayout(self)
@@ -213,7 +205,8 @@ class MEAXtd(QMainWindow):
             self.plot.plot_signals(self.plot_grid)
 
     def set_progress_value(self, value):
-        self.progressBar.setValue(value)
+        if value > self.progressBar.value() or self.progressBar.value() > 99:
+            self.progressBar.setValue(value)
 
     def open_file(self):
         """Open a QFileDialog to allow the user to open a file into the application."""
@@ -490,17 +483,17 @@ class MEAXtd(QMainWindow):
         self.plot_highlight_grid.setContentsMargins(50, -1, 50, -1)
 
         self.highlight_none_rb = QRadioButton(self.plot_highlight_groupbox, text="None")
-        self.highlight_none_rb.toggled.connect(lambda: self.plot.remove_data())
+        self.highlight_none_rb.toggled.connect(lambda: self.remove_plot_data())
         self.plot_highlight_grid.addWidget(self.highlight_none_rb, 0, 0, 1, 1)
         self.highlight_spike_rb = QRadioButton(self.plot_highlight_groupbox, text="Spikes")
-        self.highlight_spike_rb.toggled.connect(lambda: self.plot.add_spike_data())
+        self.highlight_spike_rb.toggled.connect(lambda: self.add_plot_spike_data())
         self.plot_highlight_grid.addWidget(self.highlight_spike_rb, 1, 0, 1, 1)
-        self.highlight_burstlet_rb = QRadioButton(self.plot_highlight_groupbox, text="Burstlets")
-        self.highlight_burstlet_rb.toggled.connect(lambda: self.plot.add_burstlet_data())
-        self.plot_highlight_grid.addWidget(self.highlight_burstlet_rb, 1, 1, 1, 1)
         self.highlight_burst_rb = QRadioButton(self.plot_highlight_groupbox, text="Bursts")
-        self.highlight_burst_rb.toggled.connect(lambda: self.plot.add_burst_data())
-        self.plot_highlight_grid.addWidget(self.highlight_burst_rb, 0, 1, 1, 1)
+        self.highlight_burst_rb.toggled.connect(lambda: self.add_plot_burst_data())
+        self.plot_highlight_grid.addWidget(self.highlight_burst_rb, 1, 1, 1, 1)
+        self.highlight_burstlet_rb = QRadioButton(self.plot_highlight_groupbox, text="Burstlets")
+        self.highlight_burstlet_rb.toggled.connect(lambda: self.add_plot_burstlet_data())
+        self.plot_highlight_grid.addWidget(self.highlight_burstlet_rb, 0, 1, 1, 1)
         if not hasattr(self, 'data'):
             self.highlight_none_rb.setCheckable(False)
             self.highlight_spike_rb.setCheckable(False)
@@ -537,7 +530,7 @@ class MEAXtd(QMainWindow):
 
         self.plot_navigation_button_frame = QFrame(self.plot_navigation_groupbox)
         self.plot_navigation_button_layout = QHBoxLayout(self.plot_navigation_button_frame)
-        self.plot_navigation_button_layout.setContentsMargins(30, 20, 30, 9)
+        self.plot_navigation_button_layout.setContentsMargins(50, 20, 50, 9)
         self.plot_navigation_back_button = QPushButton(self.plot_navigation_button_frame, text="<")
         size_policy_navigation_button = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         size_policy_navigation_button.setHorizontalStretch(0)
@@ -548,7 +541,7 @@ class MEAXtd(QMainWindow):
         self.plot_navigation_back_button.setEnabled(True)
         if self.highlight_none_rb.isChecked():
             self.plot_navigation_back_button.setEnabled(False)
-        self.plot_navigation_back_button.clicked.connect(lambda: self.plot.change_range_backward())
+        self.plot_navigation_back_button.clicked.connect(lambda: self.change_plot_range_prev())
         self.plot_navigation_button_layout.addWidget(self.plot_navigation_back_button)
         self.plot_navigation_next_button = QPushButton(self.plot_navigation_button_frame, text=">")
         size_policy_navigation_button_flag = self.plot_navigation_next_button.sizePolicy().hasHeightForWidth()
@@ -557,7 +550,7 @@ class MEAXtd(QMainWindow):
         self.plot_navigation_next_button.setEnabled(True)
         if self.highlight_none_rb.isChecked():
             self.plot_navigation_next_button.setEnabled(False)
-        self.plot_navigation_next_button.clicked.connect(lambda: self.plot.change_range_forward())
+        self.plot_navigation_next_button.clicked.connect(lambda: self.change_plot_range_next())
         self.plot_navigation_button_layout.addWidget(self.plot_navigation_next_button)
         self.plot_navigation_layout.addWidget(self.plot_navigation_button_frame)
 
@@ -573,6 +566,63 @@ class MEAXtd(QMainWindow):
         self.plot_bottom_layout.addWidget(self.plot_navigation_groupbox)
 
         self.plot_tab_layout.addWidget(self.plot_bot_groupbox)
+
+    def remove_plot_data(self):
+        if self.highlight_none_rb.isChecked():
+            self.plot_navigation_back_button.setEnabled(False)
+            self.plot_navigation_next_button.setEnabled(False)
+        elif self.highlight_spike_rb.isChecked() or self.highlight_burstlet_rb.isChecked() \
+                or self.highlight_burst_rb.isChecked():
+            self.plot_navigation_back_button.setEnabled(True)
+            self.plot_navigation_next_button.setEnabled(True)
+        self.plot.remove_data(self.plot_grid)
+
+    def add_plot_spike_data(self):
+        if self.highlight_spike_rb.isChecked():
+            self.remove_plot_data()
+            self.plot.add_spike_data(self.plot_grid)
+
+    def add_plot_burstlet_data(self):
+        if self.highlight_burstlet_rb.isChecked():
+            self.remove_plot_data()
+            self.plot.add_burstlet_data(self.plot_grid)
+
+    def add_plot_burst_data(self):
+        if self.highlight_burst_rb.isChecked():
+            self.remove_plot_data()
+            self.plot.add_burst_data(self.plot_grid)
+
+    def change_plot_range_next(self):
+        if self.highlight_spike_rb.isChecked():
+            data_type = 'spike'
+        if self.highlight_burstlet_rb.isChecked():
+            data_type = 'burstlet'
+        if self.highlight_burst_rb.isChecked():
+            data_type = 'burst'
+        signal_id = int(self.plot_channel_combobox.currentText())
+        self.plot.change_range_next(self.plot_grid, data_type, signal_id)
+        if data_type == 'spike':
+            self.plot_item_spinbox.setValue(self.plot.spike_id + 1)
+        if data_type == 'burstlet':
+            self.plot_item_spinbox.setValue(self.plot.burstlet_id + 1)
+        if data_type == 'burst':
+            self.plot_item_spinbox.setValue(self.plot.burst_id + 1)
+
+    def change_plot_range_prev(self):
+        if self.highlight_spike_rb.isChecked():
+            data_type = 'spike'
+        if self.highlight_burstlet_rb.isChecked():
+            data_type = 'burstlet'
+        if self.highlight_burst_rb.isChecked():
+            data_type = 'burst'
+        signal_id = int(self.plot_channel_combobox.currentText())
+        self.plot.change_range_prev(self.plot_grid, data_type, signal_id)
+        if data_type == 'spike':
+            self.plot_item_spinbox.setValue(self.plot.spike_id + 1)
+        if data_type == 'burstlet':
+            self.plot_item_spinbox.setValue(self.plot.burstlet_id + 1)
+        if data_type == 'burst':
+            self.plot_item_spinbox.setValue(self.plot.burst_id + 1)
 
 
 class AboutDialog(QDialog):
@@ -662,96 +712,83 @@ class PlotDialog(QDialog):
                 curve.setHDF5(self.data.time, curr_data, self.data.fs)
                 plot_grid.layout().itemAtPosition(col_id, row_id).widget().addItem(curve)
 
-    def remove_data(self):
-        if self.signalrbtn.isChecked():
-            self.prevqbtn.setEnabled(False)
-            self.nextqbtn.setEnabled(False)
-        elif self.spikerbtn.isChecked() or self.burstletrbtn.isChecked() or self.burstrbtn.isChecked():
-            self.prevqbtn.setEnabled(True)
-            self.nextqbtn.setEnabled(True)
+    def remove_data(self, plot_grid):
         if getattr(self, 'spike_id', None) is not None:
             self.spike_id = None
         if getattr(self, 'burstlet_id', None) is not None:
             self.burstlet_id = None
         if getattr(self, 'burst_id', None) is not None:
             self.burst_id = None
-        curr_curves = self.plot_groupbox.layout().itemAtPosition(0, 0).widget().plotItem.curves
+        curr_curves = plot_grid.layout().itemAtPosition(0, 0).widget().plotItem.curves
         if len(curr_curves) > 1:
             num_rows = 10
             num_columns = 6
             for curve_id in range(len(curr_curves) - 1, 0, -1):
                 for col_id in range(0, num_columns):
                     for row_id in range(0, num_rows):
-                        curr_plot_item = self.plot_groupbox.layout().itemAtPosition(col_id,
-                                                                                    row_id).widget().plotItem
+                        curr_plot_item = plot_grid.layout().itemAtPosition(col_id, row_id).widget().plotItem
                         curr_plot_item.removeItem(curr_plot_item.curves[curve_id])
 
-    def add_spike_data(self):
-        if self.spikerbtn.isChecked():
-            self.remove_data()
-            num_rows = 10
-            num_columns = 6
-            for col_id in range(0, num_columns):
-                for row_id in range(0, num_rows):
-                    curr_id = col_id * num_rows + row_id
-                    spikes = HDF5PlotXY()
-                    curr_spike_data = self.data.spike_stream[curr_id]
-                    spikes.setHDF5(self.data.time, curr_spike_data, self.data.fs, pen=pg.mkPen(color='k', width=2))
-                    self.plot_groupbox.layout().itemAtPosition(col_id, row_id).widget().addItem(spikes)
+    def add_spike_data(self, plot_grid):
+        num_rows = 10
+        num_columns = 6
+        for col_id in range(0, num_columns):
+            for row_id in range(0, num_rows):
+                curr_id = col_id * num_rows + row_id
+                spikes = HDF5PlotXY()
+                curr_spike_data = self.data.spike_stream[curr_id]
+                spikes.setHDF5(self.data.time, curr_spike_data, self.data.fs, pen=pg.mkPen(color='k', width=2))
+                plot_grid.layout().itemAtPosition(col_id, row_id).widget().addItem(spikes)
 
-    def add_burstlet_data(self):
-        if self.burstletrbtn.isChecked():
-            self.remove_data()
-            num_rows = 10
-            num_columns = 6
-            for col_id in range(0, num_columns):
-                for row_id in range(0, num_rows):
-                    curr_id = col_id * num_rows + row_id
-                    burstlets = HDF5PlotXY()
-                    curr_burstlet_data = self.data.burstlet_stream[curr_id]
-                    burstlets.setHDF5(self.data.time, curr_burstlet_data, self.data.fs,
-                                      pen=pg.mkPen(color='g', width=2))
-                    self.plot_groupbox.layout().itemAtPosition(col_id, row_id).widget().addItem(burstlets)
+    def add_burstlet_data(self, plot_grid):
+        num_rows = 10
+        num_columns = 6
+        for col_id in range(0, num_columns):
+            for row_id in range(0, num_rows):
+                curr_id = col_id * num_rows + row_id
+                burstlets = HDF5PlotXY()
+                curr_burstlet_data = self.data.burstlet_stream[curr_id]
+                burstlets.setHDF5(self.data.time, curr_burstlet_data, self.data.fs,
+                                  pen=pg.mkPen(color='g', width=2))
+                plot_grid.layout().itemAtPosition(col_id, row_id).widget().addItem(burstlets)
 
-    def add_burst_data(self):
-        if self.burstrbtn.isChecked():
-            self.remove_data()
-            num_rows = 10
-            num_columns = 6
-            for col_id in range(0, num_columns):
-                for row_id in range(0, num_rows):
-                    curr_id = col_id * num_rows + row_id
-                    bursts = HDF5PlotXY()
-                    curr_burst_data = self.data.burst_stream[curr_id]
-                    bursts.setHDF5(self.data.time, curr_burst_data, self.data.fs,
-                                   pen=pg.mkPen(color='b', width=2))
-                    self.plot_groupbox.layout().itemAtPosition(col_id, row_id).widget().addItem(bursts)
-                    bursts_borders = HDF5PlotXY()
-                    curr_burst_borders = self.data.burst_borders[curr_id]
-                    bursts_borders.setHDF5(self.data.time, curr_burst_borders, self.data.fs,
-                                           pen=pg.mkPen(color='r', width=1.5))
-                    self.plot_groupbox.layout().itemAtPosition(col_id, row_id).widget().addItem(bursts_borders)
+    def add_burst_data(self, plot_grid):
+        num_rows = 10
+        num_columns = 6
+        for col_id in range(0, num_columns):
+            for row_id in range(0, num_rows):
+                curr_id = col_id * num_rows + row_id
+                bursts = HDF5PlotXY()
+                curr_burst_data = self.data.burst_stream[curr_id]
+                bursts.setHDF5(self.data.time, curr_burst_data, self.data.fs,
+                               pen=pg.mkPen(color='b', width=2))
+                plot_grid.layout().itemAtPosition(col_id, row_id).widget().addItem(bursts)
+                bursts_borders = HDF5PlotXY()
+                curr_burst_borders = self.data.burst_borders[curr_id]
+                bursts_borders.setHDF5(self.data.time, curr_burst_borders, self.data.fs,
+                                       pen=pg.mkPen(color='r', width=1.5))
+                plot_grid.layout().itemAtPosition(col_id, row_id).widget().addItem(bursts_borders)
 
-    def change_range_forward(self):
-        if self.spikerbtn.isChecked():
+    def change_range_next(self, plot_grid, data_type, signal_id):
+        if data_type == 'spike':
             if getattr(self, 'spike_id', None) is None:
                 self.spike_id = 0
-            curr_signal = int(self.signalComboBox.currentText()) - 1
+            curr_signal = signal_id - 1
             curr_spike = self.data.spikes[curr_signal][self.spike_id]
             curr_spike_amplitude = self.data.spikes_amplitudes[curr_signal][self.spike_id]
             if self.spike_id < len(self.data.spikes[curr_signal]) - 1:
                 self.spike_id += 1
             left_border = max(0, self.data.time[curr_spike] - 0.5)
             right_border = min(len(self.data.time), self.data.time[curr_spike] + 0.5)
-            self.plot_groupbox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
+            plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
             if curr_spike_amplitude > 0.004:
                 top_border = max(0.002, curr_spike_amplitude / 2 + 0.0001)
                 bottom_border = min(-0.002, curr_spike_amplitude / 2 - 0.0001)
-                self.plot_groupbox.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
-        if self.burstletrbtn.isChecked():
+                plot_grid.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
+        if data_type == 'burstlet':
             if getattr(self, 'burstlet_id', None) is None:
                 self.burstlet_id = 0
-            curr_signal = int(self.signalComboBox.currentText()) - 1
+            curr_signal = signal_id - 1
             curr_burstlet = self.data.burstlets[curr_signal][self.burstlet_id]
             curr_burstlet_start = self.data.burstlets_starts[curr_signal][self.burstlet_id]
             curr_burstlet_end = self.data.burstlets_ends[curr_signal][self.burstlet_id]
@@ -764,16 +801,16 @@ class PlotDialog(QDialog):
             else:
                 left_border = self.data.time[curr_burstlet_start] - (1 - curr_burstlet_len) / 2
                 right_border = self.data.time[curr_burstlet_end] + (1 - curr_burstlet_len) / 2
-            self.plot_groupbox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
+            plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
             curr_burstlet_amplitude = self.data.burstlets_amplitudes[curr_signal][self.burstlet_id]
             if curr_burstlet_amplitude > 0.004:
                 top_border = max(0.002, curr_burstlet_amplitude / 2 + 0.0001)
                 bottom_border = min(-0.002, curr_burstlet_amplitude / 2 - 0.0001)
-                self.plot_groupbox.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
-        if self.burstrbtn.isChecked():
+                plot_grid.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
+        if data_type == 'burst':
             if getattr(self, 'burst_id', None) is None:
                 self.burst_id = 0
-            curr_signal = int(self.signalComboBox.currentText()) - 1
+            curr_signal = signal_id - 1
             curr_burst_start = self.data.bursts_starts[curr_signal][self.burst_id]
             curr_burst_end = self.data.bursts_ends[curr_signal][self.burst_id]
             if self.burst_id < len(self.data.bursts) - 1:
@@ -785,28 +822,28 @@ class PlotDialog(QDialog):
             else:
                 left_border = self.data.time[curr_burst_start] - (1 - curr_burst_len) / 2
                 right_border = self.data.time[curr_burst_end] + (1 - curr_burst_len) / 2
-            self.plot_groupbox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
+            plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
 
-    def change_range_backward(self):
-        if self.spikerbtn.isChecked():
+    def change_range_prev(self, plot_grid, data_type, signal_id):
+        if data_type == 'spike':
             if getattr(self, 'spike_id', None) is None:
                 self.spike_id = 0
-            curr_signal = int(self.signalComboBox.currentText()) - 1
+            curr_signal = signal_id - 1
             curr_spike = self.data.spikes[curr_signal][self.spike_id]
             curr_spike_amplitude = self.data.spikes_amplitudes[curr_signal][self.spike_id]
             if self.spike_id > 0:
                 self.spike_id -= 1
             left_border = max(0, self.data.time[curr_spike] - 0.5)
             right_border = min(len(self.data.time), self.data.time[curr_spike] + 0.5)
-            self.plot_groupbox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
+            plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
             if curr_spike_amplitude > 0.004:
                 top_border = max(0.002, curr_spike_amplitude / 2 + 0.0001)
                 bottom_border = min(-0.002, curr_spike_amplitude / 2 - 0.0001)
-                self.plot_groupbox.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
-        if self.burstletrbtn.isChecked():
+                plot_grid.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
+        if data_type == 'burstlet':
             if getattr(self, 'burstlet_id', None) is None:
                 self.burstlet_id = 0
-            curr_signal = int(self.signalComboBox.currentText()) - 1
+            curr_signal = signal_id - 1
             curr_burstlet = self.data.burstlets[curr_signal][self.burstlet_id]
             curr_burstlet_start = self.data.burstlets_starts[curr_signal][self.burstlet_id]
             curr_burstlet_end = self.data.burstlets_ends[curr_signal][self.burstlet_id]
@@ -819,16 +856,16 @@ class PlotDialog(QDialog):
             else:
                 left_border = self.data.time[curr_burstlet_start] - (1 - curr_burstlet_len) / 2
                 right_border = self.data.time[curr_burstlet_end] + (1 - curr_burstlet_len) / 2
-            self.plot_groupbox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
+            plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
             curr_burstlet_amplitude = self.data.burstlets_amplitudes[curr_signal][self.burstlet_id]
             if curr_burstlet_amplitude > 0.004:
                 top_border = max(0.002, curr_burstlet_amplitude / 2 + 0.0001)
                 bottom_border = min(-0.002, curr_burstlet_amplitude / 2 - 0.0001)
-                self.plot_groupbox.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
-        if self.burstrbtn.isChecked():
+                plot_grid.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
+        if data_type == 'burst':
             if getattr(self, 'burst_id', None) is None:
                 self.burst_id = 0
-            curr_signal = int(self.signalComboBox.currentText()) - 1
+            curr_signal = signal_id - 1
             curr_burst_start = self.data.bursts_starts[curr_signal][self.burst_id]
             curr_burst_end = self.data.bursts_ends[curr_signal][self.burst_id]
             if self.burst_id > 0:
@@ -840,7 +877,7 @@ class PlotDialog(QDialog):
             else:
                 left_border = self.data.time[curr_burst_start] - (1 - curr_burst_len) / 2
                 right_border = self.data.time[curr_burst_end] + (1 - curr_burst_len) / 2
-            self.plot_groupbox.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
+            plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
 
 
 class StatDialog(QDialog):

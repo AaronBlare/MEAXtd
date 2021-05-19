@@ -9,13 +9,13 @@ def find_spikes(data, method, coefficient, progress_callback):
         progress_callback.emit(round(signal_id * 40 / num_signals))
         if method == 'Median':
             noise_mad = np.median(np.absolute(signals[:, signal_id])) / 0.6745
-            crossings = detect_threshold_crossings(signals[:, signal_id], data.fs, coefficient * noise_mad, 0.0)
+            crossings = detect_threshold_crossings(signals[:, signal_id], data.fs, coefficient * noise_mad, 0.002)
         elif method == 'RMS':
             noise_rms = np.sqrt(np.mean(signals[:, signal_id] ** 2))
-            crossings = detect_threshold_crossings(signals[:, signal_id], data.fs, coefficient * noise_rms, 0.0)
+            crossings = detect_threshold_crossings(signals[:, signal_id], data.fs, coefficient * noise_rms, 0.002)
         elif method == 'std':
             noise_std = np.std(signals[:, signal_id])
-            crossings = detect_threshold_crossings(signals[:, signal_id], data.fs, coefficient * noise_std, 0.0)
+            crossings = detect_threshold_crossings(signals[:, signal_id], data.fs, coefficient * noise_std, 0.002)
 
         spikes = get_spike_peaks(signals[:, signal_id], data.fs, crossings, 0.002)
         spikes_ends, spikes_maxima = get_spike_ends(signals[:, signal_id], data.fs, crossings, 0.002)
