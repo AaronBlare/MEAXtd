@@ -525,6 +525,7 @@ class MEAXtd(QMainWindow):
         self.plot_channel_combobox = QComboBox(self.plot_channel_frame)
         signal_numbers = list(range(1, 61))
         self.plot_channel_combobox.addItems([str(num) for num in signal_numbers])
+        self.plot_channel_combobox.currentIndexChanged.connect(lambda: self.plot_channel_change())
         self.plot_channel_frame_layout.addWidget(self.plot_channel_combobox)
         self.plot_navigation_layout.addWidget(self.plot_channel_frame)
 
@@ -538,7 +539,7 @@ class MEAXtd(QMainWindow):
         size_policy_navigation_button_flag = self.plot_navigation_back_button.sizePolicy().hasHeightForWidth()
         size_policy_navigation_button.setHeightForWidth(size_policy_navigation_button_flag)
         self.plot_navigation_back_button.setSizePolicy(size_policy_navigation_button)
-        self.plot_navigation_back_button.setEnabled(True)
+        self.plot_navigation_back_button.setEnabled(False)
         if self.highlight_none_rb.isChecked():
             self.plot_navigation_back_button.setEnabled(False)
         self.plot_navigation_back_button.clicked.connect(lambda: self.change_plot_range_prev())
@@ -547,9 +548,7 @@ class MEAXtd(QMainWindow):
         size_policy_navigation_button_flag = self.plot_navigation_next_button.sizePolicy().hasHeightForWidth()
         size_policy_navigation_button.setHeightForWidth(size_policy_navigation_button_flag)
         self.plot_navigation_next_button.setSizePolicy(size_policy_navigation_button)
-        self.plot_navigation_next_button.setEnabled(True)
-        if self.highlight_none_rb.isChecked():
-            self.plot_navigation_next_button.setEnabled(False)
+        self.plot_navigation_next_button.setEnabled(False)
         self.plot_navigation_next_button.clicked.connect(lambda: self.change_plot_range_next())
         self.plot_navigation_button_layout.addWidget(self.plot_navigation_next_button)
         self.plot_navigation_layout.addWidget(self.plot_navigation_button_frame)
@@ -559,13 +558,23 @@ class MEAXtd(QMainWindow):
         self.plot_item_layout.setContentsMargins(80, -1, 80, -1)
         self.plot_item_label = QLabel(self.plot_item_frame, text="# Item")
         self.plot_item_layout.addWidget(self.plot_item_label)
-        self.plot_item_spinbox = QLabel(self.plot_item_frame, text="1")
+        self.plot_item_spinbox = QLabel(self.plot_item_frame, text="0")
         self.plot_item_layout.addWidget(self.plot_item_spinbox)
         self.plot_navigation_layout.addWidget(self.plot_item_frame)
 
         self.plot_bottom_layout.addWidget(self.plot_navigation_groupbox)
 
         self.plot_tab_layout.addWidget(self.plot_bot_groupbox)
+
+    def plot_channel_change(self):
+        self.plot_item_spinbox.setText("0")
+        if getattr(self.plot, 'spike_id', None) is not None:
+            self.plot.spike_id = None
+        if getattr(self.plot, 'burstlet_id', None) is not None:
+            self.plot.burstlet_id = None
+        if getattr(self.plot, 'burst_id', None) is not None:
+            self.plot.burst_id = None
+        self.plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(0, 1)
 
     def remove_plot_data(self):
         if self.highlight_none_rb.isChecked():
@@ -602,11 +611,11 @@ class MEAXtd(QMainWindow):
         signal_id = int(self.plot_channel_combobox.currentText())
         self.plot.change_range_next(self.plot_grid, data_type, signal_id)
         if data_type == 'spike':
-            self.plot_item_spinbox.setText(str(self.plot.spike_id + 1))
+            self.plot_item_spinbox.setText(str(self.plot.spike_id))
         if data_type == 'burstlet':
-            self.plot_item_spinbox.setText(str(self.plot.burstlet_id + 1))
+            self.plot_item_spinbox.setText(str(self.plot.burstlet_id))
         if data_type == 'burst':
-            self.plot_item_spinbox.setText(str(self.plot.burst_id + 1))
+            self.plot_item_spinbox.setText(str(self.plot.burst_id))
 
     def change_plot_range_prev(self):
         if self.highlight_spike_rb.isChecked():
@@ -618,11 +627,11 @@ class MEAXtd(QMainWindow):
         signal_id = int(self.plot_channel_combobox.currentText())
         self.plot.change_range_prev(self.plot_grid, data_type, signal_id)
         if data_type == 'spike':
-            self.plot_item_spinbox.setText(str(self.plot.spike_id + 1))
+            self.plot_item_spinbox.setText(str(self.plot.spike_id))
         if data_type == 'burstlet':
-            self.plot_item_spinbox.setText(str(self.plot.burstlet_id + 1))
+            self.plot_item_spinbox.setText(str(self.plot.burstlet_id))
         if data_type == 'burst':
-            self.plot_item_spinbox.setText(str(self.plot.burst_id + 1))
+            self.plot_item_spinbox.setText(str(self.plot.burst_id))
 
 
 class AboutDialog(QDialog):
