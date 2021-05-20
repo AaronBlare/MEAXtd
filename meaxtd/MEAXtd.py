@@ -12,7 +12,7 @@ from PySide6.QtGui import QIcon, QFont, QAction, QScreen
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QLayout, QFrame, QSizePolicy,
                                QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget, QTabWidget,
                                QGroupBox, QGridLayout, QPushButton, QComboBox, QRadioButton, QPlainTextEdit,
-                               QProgressBar, QDoubleSpinBox, QSpinBox)
+                               QProgressBar, QDoubleSpinBox, QSpinBox, QTableWidget)
 
 pg.setConfigOption('background', 'w')
 pg.setConfigOption('foreground', 'k')
@@ -142,9 +142,14 @@ class MEAXtd(QMainWindow):
         self.stat_tab_layout = QHBoxLayout(self.stat_tab)
         self.create_stat_layout()
 
+        self.char_tab = QWidget()
+        self.char_tab_layout = QGridLayout(self.char_tab)
+        self.create_char_layout()
+
         self.tabs.addTab(self.main_tab, "Main")
         self.tabs.addTab(self.plot_tab, "Signal")
         self.tabs.addTab(self.stat_tab, "Plots")
+        self.tabs.addTab(self.char_tab, "Characteristics")
 
         self.main_layout.addWidget(self.tabs)
         self.setCentralWidget(self.central_widget)
@@ -655,6 +660,40 @@ class MEAXtd(QMainWindow):
         self.stat_tab_layout.addWidget(self.stat_right_groupbox)
 
         self.stat = StatDialog(self.stat_left_groupbox_layout, self.stat_right_groupbox_layout)
+
+    def create_char_layout(self):
+        self.char_other_table = QTableWidget(self.char_tab)
+        size_policy_char_left = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        size_policy_char_left.setHorizontalStretch(1)
+        size_policy_char_left.setVerticalStretch(0)
+        size_policy_char_left_flag = self.char_other_table.sizePolicy().hasHeightForWidth()
+        size_policy_char_left.setHeightForWidth(size_policy_char_left_flag)
+        self.char_other_table.setSizePolicy(size_policy_char_left)
+        self.char_tab_layout.addWidget(self.char_other_table, 3, 0, 1, 1)
+
+        self.char_channel_table = QTableWidget(self.char_tab)
+        size_policy_char_right = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        size_policy_char_right.setHorizontalStretch(2)
+        size_policy_char_right.setVerticalStretch(0)
+        size_policy_char_right_flag = self.char_channel_table.sizePolicy().hasHeightForWidth()
+        size_policy_char_right.setHeightForWidth(size_policy_char_right_flag)
+        self.char_channel_table.setSizePolicy(size_policy_char_right)
+        self.char_tab_layout.addWidget(self.char_channel_table, 1, 1, 3, 1)
+
+        self.char_global_table = QTableWidget(self.char_tab)
+        size_policy_char_left_flag = self.char_channel_table.sizePolicy().hasHeightForWidth()
+        size_policy_char_left.setHeightForWidth(size_policy_char_left_flag)
+        self.char_global_table.setSizePolicy(size_policy_char_left)
+        self.char_tab_layout.addWidget(self.char_global_table, 1, 0, 1, 1)
+
+        self.char_channel_label = QLabel(text="Channel characteristics")
+        self.char_tab_layout.addWidget(self.char_channel_label, 0, 1, 1, 1)
+
+        self.char_global_label = QLabel(text="Global characteristics")
+        self.char_tab_layout.addWidget(self.char_global_label, 0, 0, 1, 1)
+
+        self.char_other_label = QLabel(text="Other characteristics")
+        self.char_tab_layout.addWidget(self.char_other_label, 2, 0, 1, 1)
 
 
 class AboutDialog(QDialog):
