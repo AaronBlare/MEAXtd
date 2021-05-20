@@ -21,6 +21,9 @@ class Data:
         self.bursts_burstlets = {}
         self.burst_stream = {}
         self.burst_borders = {}
+        self.global_characteristics = {}
+        self.channel_characteristics = {}
+        self.other_characteristics = {}
 
     def clear_calculated(self):
         self.spikes = {}

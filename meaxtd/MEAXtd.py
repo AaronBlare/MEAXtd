@@ -5,14 +5,14 @@ import pyqtgraph as pg
 import logging
 from meaxtd.read_h5 import read_h5_file
 from meaxtd.hdf5plot import HDF5PlotXY
-from meaxtd.find_bursts import find_spikes, find_bursts
+from meaxtd.find_bursts import find_spikes, find_bursts, calculate_characteristics
 from meaxtd.stat_plots import raster_plot, tsr_plot, colormap_plot
 from PySide6.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal
 from PySide6.QtGui import QIcon, QFont, QAction, QScreen
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QLayout, QFrame, QSizePolicy,
                                QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget, QTabWidget,
                                QGroupBox, QGridLayout, QPushButton, QComboBox, QRadioButton, QPlainTextEdit,
-                               QProgressBar, QDoubleSpinBox, QSpinBox, QTableWidget)
+                               QProgressBar, QDoubleSpinBox, QSpinBox, QTableWidget, QTableWidgetItem, QHeaderView)
 
 pg.setConfigOption('background', 'w')
 pg.setConfigOption('foreground', 'k')
@@ -360,13 +360,11 @@ class MEAXtd(QMainWindow):
         self.main_tab_button_layout.addWidget(self.processqbtn)
         self.processqbtn.clicked.connect(lambda: self.process())
 
-    def process_spikes(self, progress_callback):
-        method = self.spike_method_combobox.currentText()
-        coeff = self.spike_coeff.value()
+    def process_all(self, progress_callback):
+        spike_method = self.spike_method_combobox.currentText()
+        spike_coeff = self.spike_coeff.value()
         self.logger.info("Spikes and bursts finding...")
-        find_spikes(self.data, method, coeff, progress_callback)
-
-    def configure_buttons_after_spike(self):
+        find_spikes(self.data, spike_method, spike_coeff, progress_callback)
         if self.data.spikes:
             self.logger.info("Spikes found.")
             self.highlight_none_rb.setCheckable(True)
@@ -374,15 +372,9 @@ class MEAXtd(QMainWindow):
             self.highlight_spike_rb.setCheckable(True)
             self.stat.plot_raster(self.stat_left_groupbox_layout)
             self.stat.plot_tsr(self.stat_left_groupbox_layout)
-
-    def process_bursts(self, progress_callback):
-        spike_method = self.spike_method_combobox.currentText()
-        spike_coeff = self.spike_coeff.value()
         burst_window = self.burst_window_size.value()
         burst_num_channels = self.burst_num_channels.value()
         find_bursts(self.data, spike_method, spike_coeff, burst_window, burst_num_channels, progress_callback)
-
-    def configure_buttons_after_burst(self):
         if self.data.bursts:
             self.logger.info("Bursts found.")
             self.highlight_none_rb.setCheckable(True)
@@ -391,18 +383,23 @@ class MEAXtd(QMainWindow):
             self.highlight_burstlet_rb.setCheckable(True)
             self.highlight_burst_rb.setCheckable(True)
             self.stat.plot_colormap(self.stat_right_groupbox_layout)
+        self.logger.info("Characteristics calculating...")
+        calculate_characteristics(self.data, progress_callback)
+
+    def configure_characteristics_table(self):
+        if self.data.global_characteristics:
+            self.logger.info("Characteristics calculated.")
+            self.char_global_table.setRowCount(len(list(self.data.global_characteristics.keys())))
+            for n, key in enumerate(self.data.global_characteristics):
+                self.char_global_table.setItem(n, 0, QTableWidgetItem(key))
+                self.char_global_table.setItem(n, 1, QTableWidgetItem(str(self.data.global_characteristics[key])))
 
     def process(self):
         if self.param_change:
             self.data.clear_calculated()
         if not self.data.spikes:
-            worker = Worker(self.process_spikes)
-            worker.signals.finished.connect(self.configure_buttons_after_spike)
-            worker.signals.progress.connect(self.set_progress_value)
-            self.threadpool.start(worker)
-
-            worker = Worker(self.process_bursts)
-            worker.signals.finished.connect(self.configure_buttons_after_burst)
+            worker = Worker(self.process_all)
+            worker.signals.finished.connect(self.configure_characteristics_table)
             worker.signals.progress.connect(self.set_progress_value)
             self.threadpool.start(worker)
         else:
@@ -662,38 +659,49 @@ class MEAXtd(QMainWindow):
         self.stat = StatDialog(self.stat_left_groupbox_layout, self.stat_right_groupbox_layout)
 
     def create_char_layout(self):
-        self.char_other_table = QTableWidget(self.char_tab)
+        self.char_global_table = QTableWidget(self.char_tab)
         size_policy_char_left = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         size_policy_char_left.setHorizontalStretch(1)
         size_policy_char_left.setVerticalStretch(0)
-        size_policy_char_left_flag = self.char_other_table.sizePolicy().hasHeightForWidth()
-        size_policy_char_left.setHeightForWidth(size_policy_char_left_flag)
-        self.char_other_table.setSizePolicy(size_policy_char_left)
-        self.char_tab_layout.addWidget(self.char_other_table, 3, 0, 1, 1)
-
-        self.char_channel_table = QTableWidget(self.char_tab)
-        size_policy_char_right = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        size_policy_char_right.setHorizontalStretch(2)
-        size_policy_char_right.setVerticalStretch(0)
-        size_policy_char_right_flag = self.char_channel_table.sizePolicy().hasHeightForWidth()
-        size_policy_char_right.setHeightForWidth(size_policy_char_right_flag)
-        self.char_channel_table.setSizePolicy(size_policy_char_right)
-        self.char_tab_layout.addWidget(self.char_channel_table, 1, 1, 3, 1)
-
-        self.char_global_table = QTableWidget(self.char_tab)
-        size_policy_char_left_flag = self.char_channel_table.sizePolicy().hasHeightForWidth()
+        size_policy_char_left_flag = self.char_global_table.sizePolicy().hasHeightForWidth()
         size_policy_char_left.setHeightForWidth(size_policy_char_left_flag)
         self.char_global_table.setSizePolicy(size_policy_char_left)
+        headers = ['Characteristic', 'Value']
+        self.char_global_table.setColumnCount(2)
+        self.char_global_table.setHorizontalHeaderLabels(headers)
+        self.char_global_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.char_global_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.char_tab_layout.addWidget(self.char_global_table, 1, 0, 1, 1)
 
-        self.char_channel_label = QLabel(text="Channel characteristics")
-        self.char_tab_layout.addWidget(self.char_channel_label, 0, 1, 1, 1)
+        self.char_channel_table = QTableWidget(self.char_tab)
+        size_policy_char_center = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        size_policy_char_center.setHorizontalStretch(3)
+        size_policy_char_center.setVerticalStretch(0)
+        size_policy_char_center_flag = self.char_channel_table.sizePolicy().hasHeightForWidth()
+        size_policy_char_center.setHeightForWidth(size_policy_char_center_flag)
+        self.char_channel_table.setSizePolicy(size_policy_char_center)
+        self.char_tab_layout.addWidget(self.char_channel_table, 1, 2, 3, 1)
+
+        self.char_burst_table = QTableWidget(self.char_tab)
+        size_policy_char_right = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        size_policy_char_right.setHorizontalStretch(3)
+        size_policy_char_right.setVerticalStretch(0)
+        size_policy_char_right_flag = self.char_burst_table.sizePolicy().hasHeightForWidth()
+        size_policy_char_right.setHeightForWidth(size_policy_char_right_flag)
+        self.char_burst_table.setSizePolicy(size_policy_char_right)
+        self.char_tab_layout.addWidget(self.char_burst_table, 1, 3, 1, 1)
 
         self.char_global_label = QLabel(text="Global characteristics")
+        self.char_global_label.setFont(self.gbox_font)
         self.char_tab_layout.addWidget(self.char_global_label, 0, 0, 1, 1)
 
-        self.char_other_label = QLabel(text="Other characteristics")
-        self.char_tab_layout.addWidget(self.char_other_label, 2, 0, 1, 1)
+        self.char_channel_label = QLabel(text="Channel characteristics")
+        self.char_channel_label.setFont(self.gbox_font)
+        self.char_tab_layout.addWidget(self.char_channel_label, 0, 2, 1, 1)
+
+        self.char_burst_label = QLabel(text="Burst characteristics")
+        self.char_burst_label.setFont(self.gbox_font)
+        self.char_tab_layout.addWidget(self.char_burst_label, 0, 3, 1, 1)
 
 
 class AboutDialog(QDialog):
@@ -711,18 +719,22 @@ class AboutDialog(QDialog):
         author = QLabel('Aaron Blare')
         author.setAlignment(Qt.AlignCenter)
 
-        icons = QLabel('Material design icons created by Google')
-        icons.setAlignment(Qt.AlignCenter)
+        # icons = QLabel('Material design icons created by Google')
+        # icons.setAlignment(Qt.AlignCenter)
 
         github = QLabel('GitHub: AaronBlare')
         github.setAlignment(Qt.AlignCenter)
+
+        email = QLabel('Email: kalyakulina.alena@gmail.com')
+        email.setAlignment(Qt.AlignCenter)
 
         self.layout = QVBoxLayout()
         self.layout.setAlignment(Qt.AlignVCenter)
 
         self.layout.addWidget(author)
-        self.layout.addWidget(icons)
+        # self.layout.addWidget(icons)
         self.layout.addWidget(github)
+        self.layout.addWidget(email)
 
         self.setLayout(self.layout)
 

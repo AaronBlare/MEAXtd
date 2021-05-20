@@ -9,7 +9,7 @@ def find_spikes(data, method, coefficient, progress_callback):
     data.TSR = np.zeros(int(total_time_in_ms / 50), dtype=int)
     data.TSR_times = np.arange(0, data.time[-1], 0.05)
     for signal_id in range(0, num_signals):
-        progress_callback.emit(round(signal_id * 40 / num_signals))
+        progress_callback.emit(round(signal_id * 30 / num_signals))
         if method == 'Median':
             noise_mad = np.median(np.absolute(signals[:, signal_id])) / 0.6745
             crossings = detect_threshold_crossings(signals[:, signal_id], data.fs, coefficient * noise_mad, 0.002)
@@ -93,7 +93,7 @@ def find_burstlets(data, spike_method, spike_coeff, burst_window, progress_callb
     num_signals = signals.shape[1]
     window = 10 * burst_window  # sampling frequency 0.1 ms
     for signal_id in range(0, num_signals):
-        progress_callback.emit(40 + round(signal_id * 40 / num_signals))
+        progress_callback.emit(30 + round(signal_id * 30 / num_signals))
         data.burstlets[signal_id] = []
         num_spikes = len(spikes[signal_id])
         curr_burstlet = []
@@ -156,7 +156,7 @@ def find_bursts(data, spike_method, spike_coeff, burst_window, burst_num_channel
     threshold_crossings_ids = np.argwhere(threshold_crossings)[:, 0]
     interval_tree = create_interval_tree(data)
     for interval_id in range(0, len(threshold_crossings_ids) // 2):
-        progress_callback.emit(80 + int(interval_id * 10 / (len(threshold_crossings_ids) // 2)))
+        progress_callback.emit(60 + int(interval_id * 10 / (len(threshold_crossings_ids) // 2)))
         interval_start = threshold_crossings_ids[interval_id * 2]
         interval_end = threshold_crossings_ids[interval_id * 2 + 1]
         curr_intervals = interval_tree.overlap(interval_start, interval_end)
@@ -224,7 +224,7 @@ def find_bursts(data, spike_method, spike_coeff, burst_window, burst_num_channel
             data.burst_deactivation[signal_id] = curr_deactivations / num_deactivations
 
     for signal_id in range(0, num_signals):
-        progress_callback.emit(90 + round(signal_id * 10 / num_signals))
+        progress_callback.emit(70 + round(signal_id * 10 / num_signals))
         data.burst_stream[signal_id] = np.empty(len(signals[:, signal_id]))
         data.burst_stream[signal_id][:] = np.nan
         data.burst_borders[signal_id] = np.empty(len(signals[:, signal_id]))
@@ -242,5 +242,50 @@ def find_bursts(data, spike_method, spike_coeff, burst_window, burst_num_channel
                 for curr_id in range(data.burstlets_starts[signal_id][burst_id],
                                      data.burstlets_ends[signal_id][burst_id]):
                     data.burst_stream[signal_id][curr_id] = signals[curr_id, signal_id]
+
+
+def calculate_characteristics(data, progress_callback):
+    progress_callback.emit(80)
+
+    signals = data.stream
+    num_signals = signals.shape[1]
+    num_seconds = data.time[-1]
+    total_num_spikes = 0
+    for signal_id in range(0, num_signals):
+        total_num_spikes += len(data.spikes[signal_id])
+    num_spikes_per_second = total_num_spikes / num_seconds
+    num_spikes_per_ms = total_num_spikes / (num_seconds * 1000)
+    spike_amplitudes = []
+    for signal_id in range(0, num_signals):
+        for spike_amplitude in data.spikes_amplitudes[signal_id]:
+            spike_amplitudes.append(spike_amplitude)
+    mean_spike_amplitude = np.mean(spike_amplitudes)
+    std_spike_amplitude = np.std(spike_amplitudes)
+    median_spike_amplitude = np.median(spike_amplitudes)
+    raster_duration_sec = data.time[-1]
+    raster_duration_ms = data.time[-1] * 1000
+    total_num_bursts = len(data.bursts)
+    num_bursts_per_second = total_num_bursts / num_seconds
+    num_bursts_per_min = total_num_bursts / (num_seconds / 60)
+    time_bin = 50
+    mean_num_spikes_time_bin = np.mean(data.TSR)
+    std_num_spikes_time_bin = np.std(data.TSR)
+
+    progress_callback.emit(82)
+
+    data.global_characteristics['Total number of spikes'] = total_num_spikes
+    data.global_characteristics['Num spikes per second'] = num_spikes_per_second
+    data.global_characteristics['Num spikes per ms'] = num_spikes_per_ms
+    data.global_characteristics['Mean spike amplitude'] = mean_spike_amplitude
+    data.global_characteristics['Std spike amplitude'] = std_spike_amplitude
+    data.global_characteristics['Median spike amplitude'] = median_spike_amplitude
+    data.global_characteristics['Raster duration in sec'] = raster_duration_sec
+    data.global_characteristics['Raster duration in ms'] = raster_duration_ms
+    data.global_characteristics['Total number of bursts'] = total_num_bursts
+    data.global_characteristics['Num bursts per second'] = num_bursts_per_second
+    data.global_characteristics['Num bursts per minute'] = num_bursts_per_min
+    data.global_characteristics['Time bin in ms'] = time_bin
+    data.global_characteristics['Mean number of spikes in time bin'] = mean_num_spikes_time_bin
+    data.global_characteristics['Std number of spikes in time bin'] = std_num_spikes_time_bin
 
     progress_callback.emit(100)
