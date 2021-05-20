@@ -5,7 +5,7 @@ import pyqtgraph as pg
 import logging
 from meaxtd.read_h5 import read_h5_file
 from meaxtd.hdf5plot import HDF5PlotXY
-from meaxtd.find_bursts import find_spikes, find_bursts, calculate_characteristics
+from meaxtd.find_bursts import find_spikes, find_bursts, calculate_characteristics, save_tables_to_file
 from meaxtd.stat_plots import raster_plot, tsr_plot, colormap_plot
 from PySide6.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal
 from PySide6.QtGui import QIcon, QFont, QAction, QScreen
@@ -214,6 +214,7 @@ class MEAXtd(QMainWindow):
     def open_file(self):
         """Open a QFileDialog to allow the user to open a file into the application."""
         filename, accepted = QFileDialog.getOpenFileName(self, 'Open File', filter="*.h5")
+        self.filename = filename
 
         if accepted:
             self.logger.info(f"File {filename} loading...")
@@ -385,21 +386,24 @@ class MEAXtd(QMainWindow):
             self.stat.plot_colormap(self.stat_right_groupbox_layout)
         self.logger.info("Characteristics calculating...")
         calculate_characteristics(self.data, progress_callback)
-
-    def configure_characteristics_table(self):
         if self.data.global_characteristics:
             self.logger.info("Characteristics calculated.")
             self.char_global_table.setRowCount(len(list(self.data.global_characteristics.keys())))
             for n, key in enumerate(self.data.global_characteristics):
                 self.char_global_table.setItem(n, 0, QTableWidgetItem(key))
                 self.char_global_table.setItem(n, 1, QTableWidgetItem(str(self.data.global_characteristics[key])))
+        self.path_to_save = save_tables_to_file(self.data, self.filename, spike_method, spike_coeff, burst_window,
+                                                burst_num_channels, progress_callback)
+
+    def save_characteristics(self):
+        self.logger.info(f"Characteristics saved to {self.path_to_save}")
 
     def process(self):
         if self.param_change:
             self.data.clear_calculated()
         if not self.data.spikes:
             worker = Worker(self.process_all)
-            worker.signals.finished.connect(self.configure_characteristics_table)
+            worker.signals.finished.connect(self.save_characteristics)
             worker.signals.progress.connect(self.set_progress_value)
             self.threadpool.start(worker)
         else:

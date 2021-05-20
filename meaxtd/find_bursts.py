@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from intervaltree import IntervalTree
 
@@ -288,4 +289,20 @@ def calculate_characteristics(data, progress_callback):
     data.global_characteristics['Mean number of spikes in time bin'] = mean_num_spikes_time_bin
     data.global_characteristics['Std number of spikes in time bin'] = std_num_spikes_time_bin
 
+    progress_callback.emit(90)
+
+
+def save_tables_to_file(data, filepath, spike_method, spike_coeff, burst_window, burst_num_channels, progress_callback):
+    progress_callback.emit(90)
+    path = filepath[:-3]
+    os.mkdir(path)
+    suffix = f"{spike_method}_{str(spike_coeff)}_{str(burst_window)}_{str(burst_num_channels)}"
+    path = f"{path}/characteristics_{suffix}/"
+    os.mkdir(path)
+    f = open(path + 'global.txt', 'w')
+    f.write('Characteristic\tValue\n')
+    for key in data.global_characteristics:
+        f.write(key + '\t' + str(data.global_characteristics[key]) + '\n')
+    f.close()
     progress_callback.emit(100)
+    return path
