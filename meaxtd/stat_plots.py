@@ -27,3 +27,16 @@ def tsr_plot(data):
     curr_data = data.TSR
     curve.setData(x=data.TSR_times, y=curr_data, pen=pg.mkPen('k'))
     return curve
+
+
+def colormap_plot(data):
+    max_value = np.max(data)
+    data = np.insert(data, 0, None)
+    data = np.insert(data, 7, None)
+    data = np.insert(data, 56, None)
+    data = np.insert(data, 63, None)
+    data.resize((8, 8))
+    img = pg.ImageItem(image=data)
+    cm = pg.colormap.get('CET-R4')
+    bar = pg.ColorBarItem(interactive=False, values=(0, max_value), cmap=cm, label="Spike times, s")
+    return img, bar

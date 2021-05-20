@@ -6,7 +6,7 @@ import logging
 from meaxtd.read_h5 import read_h5_file
 from meaxtd.hdf5plot import HDF5PlotXY
 from meaxtd.find_bursts import find_spikes, find_bursts
-from meaxtd.stat_plots import raster_plot, tsr_plot
+from meaxtd.stat_plots import raster_plot, tsr_plot, colormap_plot
 from PySide6.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal
 from PySide6.QtGui import QIcon, QFont, QAction, QScreen
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QLayout, QFrame, QSizePolicy,
@@ -385,6 +385,7 @@ class MEAXtd(QMainWindow):
             self.highlight_spike_rb.setCheckable(True)
             self.highlight_burstlet_rb.setCheckable(True)
             self.highlight_burst_rb.setCheckable(True)
+            self.stat.plot_colormap(self.stat_right_groupbox_layout)
 
     def process(self):
         if self.param_change:
@@ -610,11 +611,11 @@ class MEAXtd(QMainWindow):
         signal_id = int(self.plot_channel_combobox.currentText())
         self.plot.change_range_next(self.plot_grid, data_type, signal_id)
         if data_type == 'spike':
-            self.plot_item_spinbox.setText(str(self.plot.spike_id))
+            self.plot_item_spinbox.setText(str(self.plot.spike_id + 1))
         if data_type == 'burstlet':
-            self.plot_item_spinbox.setText(str(self.plot.burstlet_id))
+            self.plot_item_spinbox.setText(str(self.plot.burstlet_id + 1))
         if data_type == 'burst':
-            self.plot_item_spinbox.setText(str(self.plot.burst_id))
+            self.plot_item_spinbox.setText(str(self.plot.burst_id + 1))
 
     def change_plot_range_prev(self):
         if self.highlight_spike_rb.isChecked():
@@ -626,11 +627,11 @@ class MEAXtd(QMainWindow):
         signal_id = int(self.plot_channel_combobox.currentText())
         self.plot.change_range_prev(self.plot_grid, data_type, signal_id)
         if data_type == 'spike':
-            self.plot_item_spinbox.setText(str(self.plot.spike_id))
+            self.plot_item_spinbox.setText(str(self.plot.spike_id + 1))
         if data_type == 'burstlet':
-            self.plot_item_spinbox.setText(str(self.plot.burstlet_id))
+            self.plot_item_spinbox.setText(str(self.plot.burstlet_id + 1))
         if data_type == 'burst':
-            self.plot_item_spinbox.setText(str(self.plot.burst_id))
+            self.plot_item_spinbox.setText(str(self.plot.burst_id + 1))
 
     def create_stat_layout(self):
         self.stat_left_groupbox = QGroupBox(self.stat_tab)
@@ -795,20 +796,21 @@ class PlotDialog(QDialog):
                                pen=pg.mkPen(color='b', width=2))
                 plot_grid.layout().itemAtPosition(col_id, row_id).widget().addItem(bursts)
                 bursts_borders = HDF5PlotXY()
-                curr_burst_borders = self.data.burst_borders[curr_id]
-                bursts_borders.setHDF5(self.data.time, curr_burst_borders, self.data.fs,
-                                       pen=pg.mkPen(color='r', width=1.5))
+                # curr_burst_borders = self.data.burst_borders[curr_id]
+                # bursts_borders.setHDF5(self.data.time, curr_burst_borders, self.data.fs,
+                #                       pen=pg.mkPen(color='r', width=1.5))
                 plot_grid.layout().itemAtPosition(col_id, row_id).widget().addItem(bursts_borders)
 
     def change_range_next(self, plot_grid, data_type, signal_id):
+        curr_signal = signal_id - 1
         if data_type == 'spike':
             if getattr(self, 'spike_id', None) is None:
                 self.spike_id = 0
-            curr_signal = signal_id - 1
+            else:
+                if self.spike_id < len(self.data.spikes[curr_signal]) - 1:
+                    self.spike_id += 1
             curr_spike = self.data.spikes[curr_signal][self.spike_id]
             curr_spike_amplitude = self.data.spikes_amplitudes[curr_signal][self.spike_id]
-            if self.spike_id < len(self.data.spikes[curr_signal]) - 1:
-                self.spike_id += 1
             left_border = max(0, self.data.time[curr_spike] - 0.5)
             right_border = min(len(self.data.time), self.data.time[curr_spike] + 0.5)
             plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
@@ -819,12 +821,12 @@ class PlotDialog(QDialog):
         if data_type == 'burstlet':
             if getattr(self, 'burstlet_id', None) is None:
                 self.burstlet_id = 0
-            curr_signal = signal_id - 1
+            else:
+                if self.burstlet_id < len(self.data.burstlets[curr_signal]) - 1:
+                    self.burstlet_id += 1
             curr_burstlet = self.data.burstlets[curr_signal][self.burstlet_id]
             curr_burstlet_start = self.data.burstlets_starts[curr_signal][self.burstlet_id]
             curr_burstlet_end = self.data.burstlets_ends[curr_signal][self.burstlet_id]
-            if self.burstlet_id < len(self.data.burstlets[curr_signal]) - 1:
-                self.burstlet_id += 1
             curr_burstlet_len = self.data.time[curr_burstlet_end] - self.data.time[curr_burstlet_start]
             if curr_burstlet_len > 1:
                 left_border = self.data.time[curr_burstlet_start] - 0.1
@@ -841,11 +843,11 @@ class PlotDialog(QDialog):
         if data_type == 'burst':
             if getattr(self, 'burst_id', None) is None:
                 self.burst_id = 0
-            curr_signal = signal_id - 1
+            else:
+                if self.burst_id < len(self.data.bursts) - 1:
+                    self.burst_id += 1
             curr_burst_start = self.data.bursts_starts[curr_signal][self.burst_id]
             curr_burst_end = self.data.bursts_ends[curr_signal][self.burst_id]
-            if self.burst_id < len(self.data.bursts) - 1:
-                self.burst_id += 1
             curr_burst_len = self.data.time[curr_burst_end] - self.data.time[curr_burst_start]
             if curr_burst_len > 1:
                 left_border = self.data.time[curr_burst_start] - 0.1
@@ -856,14 +858,15 @@ class PlotDialog(QDialog):
             plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
 
     def change_range_prev(self, plot_grid, data_type, signal_id):
+        curr_signal = signal_id - 1
         if data_type == 'spike':
             if getattr(self, 'spike_id', None) is None:
                 self.spike_id = 0
-            curr_signal = signal_id - 1
+            else:
+                if self.spike_id > 0:
+                    self.spike_id -= 1
             curr_spike = self.data.spikes[curr_signal][self.spike_id]
             curr_spike_amplitude = self.data.spikes_amplitudes[curr_signal][self.spike_id]
-            if self.spike_id > 0:
-                self.spike_id -= 1
             left_border = max(0, self.data.time[curr_spike] - 0.5)
             right_border = min(len(self.data.time), self.data.time[curr_spike] + 0.5)
             plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
@@ -874,12 +877,12 @@ class PlotDialog(QDialog):
         if data_type == 'burstlet':
             if getattr(self, 'burstlet_id', None) is None:
                 self.burstlet_id = 0
-            curr_signal = signal_id - 1
+            else:
+                if self.burstlet_id > 0:
+                    self.burstlet_id -= 1
             curr_burstlet = self.data.burstlets[curr_signal][self.burstlet_id]
             curr_burstlet_start = self.data.burstlets_starts[curr_signal][self.burstlet_id]
             curr_burstlet_end = self.data.burstlets_ends[curr_signal][self.burstlet_id]
-            if self.burstlet_id > 0:
-                self.burstlet_id -= 1
             curr_burstlet_len = curr_burstlet_end - curr_burstlet_start
             if curr_burstlet_len > 1:
                 left_border = self.data.time[curr_burstlet_start] - 0.1
@@ -896,11 +899,11 @@ class PlotDialog(QDialog):
         if data_type == 'burst':
             if getattr(self, 'burst_id', None) is None:
                 self.burst_id = 0
-            curr_signal = signal_id - 1
+            else:
+                if self.burst_id > 0:
+                    self.burst_id -= 1
             curr_burst_start = self.data.bursts_starts[curr_signal][self.burst_id]
             curr_burst_end = self.data.bursts_ends[curr_signal][self.burst_id]
-            if self.burst_id > 0:
-                self.burst_id -= 1
             curr_burst_len = self.data.time[curr_burst_end] - self.data.time[curr_burst_start]
             if curr_burst_len > 1:
                 left_border = self.data.time[curr_burst_start] - 0.1
@@ -916,13 +919,14 @@ class StatDialog(QDialog):
     def __init__(self, left_layout, right_layout, data=None):
         super().__init__()
         self.data = data
-        self.init_ui(left_layout)
+        self.init_ui(left_layout, right_layout)
 
     def set_data(self, data):
         self.data = data
 
-    def init_ui(self, left_layout):
+    def init_ui(self, left_layout, right_layout):
         self.configure_left(left_layout)
+        self.configure_right(right_layout)
 
     def configure_left(self, left_layout):
 
@@ -953,6 +957,24 @@ class StatDialog(QDialog):
         t_plot.getViewBox().setXLink(r_plot)
         left_layout.addWidget(t_plot, 1, 0)
 
+    def configure_right(self, right_layout):
+
+        act_plot = pg.PlotWidget(title='Burst activation')
+        act_plot.setXRange(0, 8)
+        act_plot.setYRange(0, 8)
+        act_plot.getViewBox().invertY(True)
+        act_plot.setLabel('left', 'Electrode')
+        act_plot.setLabel('bottom', 'Electrode')
+        right_layout.addWidget(act_plot, 0, 0)
+
+        deact_plot = pg.PlotWidget(title='Burst deactivation')
+        deact_plot.setXRange(0, 8)
+        deact_plot.setYRange(0, 8)
+        deact_plot.getViewBox().invertY(True)
+        deact_plot.setLabel('left', 'Electrode')
+        deact_plot.setLabel('bottom', 'Electrode')
+        right_layout.addWidget(deact_plot, 1, 0)
+
     def plot_raster(self, left_layout):
         rplot = raster_plot(self.data)
         left_layout.layout().itemAtPosition(0, 0).widget().addItem(rplot)
@@ -961,6 +983,15 @@ class StatDialog(QDialog):
         tplot = tsr_plot(self.data)
         left_layout.layout().itemAtPosition(1, 0).widget().setLimits(yMin=-1, yMax=max(self.data.TSR) + 1)
         left_layout.layout().itemAtPosition(1, 0).widget().addItem(tplot)
+
+    def plot_colormap(self, right_layout):
+        act_plot, act_bar = colormap_plot(self.data.burst_activation)
+        right_layout.layout().itemAtPosition(0, 0).widget().addItem(act_plot)
+        act_bar.setImageItem(act_plot, insert_in=right_layout.layout().itemAtPosition(0, 0).widget().plotItem)
+
+        deact_plot, deact_bar = colormap_plot(self.data.burst_deactivation)
+        right_layout.layout().itemAtPosition(1, 0).widget().addItem(deact_plot)
+        deact_bar.setImageItem(deact_plot, insert_in=right_layout.layout().itemAtPosition(1, 0).widget().plotItem)
 
 
 def main(args=sys.argv):
