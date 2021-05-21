@@ -895,53 +895,56 @@ class PlotDialog(QDialog):
             else:
                 if self.spike_id < len(self.data.spikes[curr_signal]) - 1:
                     self.spike_id += 1
-            curr_spike = self.data.spikes[curr_signal][self.spike_id]
-            curr_spike_amplitude = self.data.spikes_amplitudes[curr_signal][self.spike_id]
-            left_border = max(0, self.data.time[curr_spike] - 0.5)
-            right_border = min(len(self.data.time), self.data.time[curr_spike] + 0.5)
-            plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
-            if curr_spike_amplitude > 0.004:
-                top_border = max(0.002, curr_spike_amplitude / 2 + 0.0001)
-                bottom_border = min(-0.002, curr_spike_amplitude / 2 - 0.0001)
-                plot_grid.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
+            if self.data.spikes[curr_signal]:
+                curr_spike = self.data.spikes[curr_signal][self.spike_id]
+                curr_spike_amplitude = self.data.spikes_amplitudes[curr_signal][self.spike_id]
+                left_border = max(0, self.data.time[curr_spike] - 0.5)
+                right_border = min(len(self.data.time), self.data.time[curr_spike] + 0.5)
+                plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
+                if curr_spike_amplitude > 0.004:
+                    top_border = max(0.002, curr_spike_amplitude / 2 + 0.0001)
+                    bottom_border = min(-0.002, curr_spike_amplitude / 2 - 0.0001)
+                    plot_grid.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
         if data_type == 'burstlet':
             if getattr(self, 'burstlet_id', None) is None:
                 self.burstlet_id = 0
             else:
                 if self.burstlet_id < len(self.data.burstlets[curr_signal]) - 1:
                     self.burstlet_id += 1
-            curr_burstlet = self.data.burstlets[curr_signal][self.burstlet_id]
-            curr_burstlet_start = self.data.burstlets_starts[curr_signal][self.burstlet_id]
-            curr_burstlet_end = self.data.burstlets_ends[curr_signal][self.burstlet_id]
-            curr_burstlet_len = self.data.time[curr_burstlet_end] - self.data.time[curr_burstlet_start]
-            if curr_burstlet_len > 1:
-                left_border = self.data.time[curr_burstlet_start] - 0.1
-                right_border = self.data.time[curr_burstlet_end] + 0.1
-            else:
-                left_border = self.data.time[curr_burstlet_start] - (1 - curr_burstlet_len) / 2
-                right_border = self.data.time[curr_burstlet_end] + (1 - curr_burstlet_len) / 2
-            plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
-            curr_burstlet_amplitude = self.data.burstlets_amplitudes[curr_signal][self.burstlet_id]
-            if curr_burstlet_amplitude > 0.004:
-                top_border = max(0.002, curr_burstlet_amplitude / 2 + 0.0001)
-                bottom_border = min(-0.002, curr_burstlet_amplitude / 2 - 0.0001)
-                plot_grid.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
+            if self.data.burstlets[curr_signal]:
+                curr_burstlet = self.data.burstlets[curr_signal][self.burstlet_id]
+                curr_burstlet_start = self.data.burstlets_starts[curr_signal][self.burstlet_id]
+                curr_burstlet_end = self.data.burstlets_ends[curr_signal][self.burstlet_id]
+                curr_burstlet_len = self.data.time[curr_burstlet_end] - self.data.time[curr_burstlet_start]
+                if curr_burstlet_len > 1:
+                    left_border = self.data.time[curr_burstlet_start] - 0.1
+                    right_border = self.data.time[curr_burstlet_end] + 0.1
+                else:
+                    left_border = self.data.time[curr_burstlet_start] - (1 - curr_burstlet_len) / 2
+                    right_border = self.data.time[curr_burstlet_end] + (1 - curr_burstlet_len) / 2
+                plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
+                curr_burstlet_amplitude = self.data.burstlets_amplitudes[curr_signal][self.burstlet_id]
+                if curr_burstlet_amplitude > 0.004:
+                    top_border = max(0.002, curr_burstlet_amplitude / 2 + 0.0001)
+                    bottom_border = min(-0.002, curr_burstlet_amplitude / 2 - 0.0001)
+                    plot_grid.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
         if data_type == 'burst':
             if getattr(self, 'burst_id', None) is None:
                 self.burst_id = 0
             else:
                 if self.burst_id < len(self.data.bursts) - 1:
                     self.burst_id += 1
-            curr_burst_start = self.data.bursts_starts[curr_signal][self.burst_id]
-            curr_burst_end = self.data.bursts_ends[curr_signal][self.burst_id]
-            curr_burst_len = self.data.time[curr_burst_end] - self.data.time[curr_burst_start]
-            if curr_burst_len > 1:
-                left_border = self.data.time[curr_burst_start] - 0.1
-                right_border = self.data.time[curr_burst_end] + 0.1
-            else:
-                left_border = self.data.time[curr_burst_start] - (1 - curr_burst_len) / 2
-                right_border = self.data.time[curr_burst_end] + (1 - curr_burst_len) / 2
-            plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
+            if self.data.bursts_starts[curr_signal]:
+                curr_burst_start = self.data.bursts_starts[curr_signal][self.burst_id]
+                curr_burst_end = self.data.bursts_ends[curr_signal][self.burst_id]
+                curr_burst_len = self.data.time[curr_burst_end] - self.data.time[curr_burst_start]
+                if curr_burst_len > 1:
+                    left_border = self.data.time[curr_burst_start] - 0.1
+                    right_border = self.data.time[curr_burst_end] + 0.1
+                else:
+                    left_border = self.data.time[curr_burst_start] - (1 - curr_burst_len) / 2
+                    right_border = self.data.time[curr_burst_end] + (1 - curr_burst_len) / 2
+                plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
 
     def change_range_prev(self, plot_grid, data_type, signal_id):
         curr_signal = signal_id - 1
@@ -951,53 +954,56 @@ class PlotDialog(QDialog):
             else:
                 if self.spike_id > 0:
                     self.spike_id -= 1
-            curr_spike = self.data.spikes[curr_signal][self.spike_id]
-            curr_spike_amplitude = self.data.spikes_amplitudes[curr_signal][self.spike_id]
-            left_border = max(0, self.data.time[curr_spike] - 0.5)
-            right_border = min(len(self.data.time), self.data.time[curr_spike] + 0.5)
-            plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
-            if curr_spike_amplitude > 0.004:
-                top_border = max(0.002, curr_spike_amplitude / 2 + 0.0001)
-                bottom_border = min(-0.002, curr_spike_amplitude / 2 - 0.0001)
-                plot_grid.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
+            if self.data.spikes[curr_signal]:
+                curr_spike = self.data.spikes[curr_signal][self.spike_id]
+                curr_spike_amplitude = self.data.spikes_amplitudes[curr_signal][self.spike_id]
+                left_border = max(0, self.data.time[curr_spike] - 0.5)
+                right_border = min(len(self.data.time), self.data.time[curr_spike] + 0.5)
+                plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
+                if curr_spike_amplitude > 0.004:
+                    top_border = max(0.002, curr_spike_amplitude / 2 + 0.0001)
+                    bottom_border = min(-0.002, curr_spike_amplitude / 2 - 0.0001)
+                    plot_grid.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
         if data_type == 'burstlet':
             if getattr(self, 'burstlet_id', None) is None:
                 self.burstlet_id = 0
             else:
                 if self.burstlet_id > 0:
                     self.burstlet_id -= 1
-            curr_burstlet = self.data.burstlets[curr_signal][self.burstlet_id]
-            curr_burstlet_start = self.data.burstlets_starts[curr_signal][self.burstlet_id]
-            curr_burstlet_end = self.data.burstlets_ends[curr_signal][self.burstlet_id]
-            curr_burstlet_len = curr_burstlet_end - curr_burstlet_start
-            if curr_burstlet_len > 1:
-                left_border = self.data.time[curr_burstlet_start] - 0.1
-                right_border = self.data.time[curr_burstlet_end] + 0.1
-            else:
-                left_border = self.data.time[curr_burstlet_start] - (1 - curr_burstlet_len) / 2
-                right_border = self.data.time[curr_burstlet_end] + (1 - curr_burstlet_len) / 2
-            plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
-            curr_burstlet_amplitude = self.data.burstlets_amplitudes[curr_signal][self.burstlet_id]
-            if curr_burstlet_amplitude > 0.004:
-                top_border = max(0.002, curr_burstlet_amplitude / 2 + 0.0001)
-                bottom_border = min(-0.002, curr_burstlet_amplitude / 2 - 0.0001)
-                plot_grid.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
+            if self.data.burstlets[curr_signal]:
+                curr_burstlet = self.data.burstlets[curr_signal][self.burstlet_id]
+                curr_burstlet_start = self.data.burstlets_starts[curr_signal][self.burstlet_id]
+                curr_burstlet_end = self.data.burstlets_ends[curr_signal][self.burstlet_id]
+                curr_burstlet_len = curr_burstlet_end - curr_burstlet_start
+                if curr_burstlet_len > 1:
+                    left_border = self.data.time[curr_burstlet_start] - 0.1
+                    right_border = self.data.time[curr_burstlet_end] + 0.1
+                else:
+                    left_border = self.data.time[curr_burstlet_start] - (1 - curr_burstlet_len) / 2
+                    right_border = self.data.time[curr_burstlet_end] + (1 - curr_burstlet_len) / 2
+                plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
+                curr_burstlet_amplitude = self.data.burstlets_amplitudes[curr_signal][self.burstlet_id]
+                if curr_burstlet_amplitude > 0.004:
+                    top_border = max(0.002, curr_burstlet_amplitude / 2 + 0.0001)
+                    bottom_border = min(-0.002, curr_burstlet_amplitude / 2 - 0.0001)
+                    plot_grid.layout().itemAtPosition(0, 0).widget().setYRange(top_border, bottom_border)
         if data_type == 'burst':
             if getattr(self, 'burst_id', None) is None:
                 self.burst_id = 0
             else:
                 if self.burst_id > 0:
                     self.burst_id -= 1
-            curr_burst_start = self.data.bursts_starts[curr_signal][self.burst_id]
-            curr_burst_end = self.data.bursts_ends[curr_signal][self.burst_id]
-            curr_burst_len = self.data.time[curr_burst_end] - self.data.time[curr_burst_start]
-            if curr_burst_len > 1:
-                left_border = self.data.time[curr_burst_start] - 0.1
-                right_border = self.data.time[curr_burst_end] + 0.1
-            else:
-                left_border = self.data.time[curr_burst_start] - (1 - curr_burst_len) / 2
-                right_border = self.data.time[curr_burst_end] + (1 - curr_burst_len) / 2
-            plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
+            if self.data.bursts_starts[curr_signal]:
+                curr_burst_start = self.data.bursts_starts[curr_signal][self.burst_id]
+                curr_burst_end = self.data.bursts_ends[curr_signal][self.burst_id]
+                curr_burst_len = self.data.time[curr_burst_end] - self.data.time[curr_burst_start]
+                if curr_burst_len > 1:
+                    left_border = self.data.time[curr_burst_start] - 0.1
+                    right_border = self.data.time[curr_burst_end] + 0.1
+                else:
+                    left_border = self.data.time[curr_burst_start] - (1 - curr_burst_len) / 2
+                    right_border = self.data.time[curr_burst_end] + (1 - curr_burst_len) / 2
+                plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
 
 
 class StatDialog(QDialog):

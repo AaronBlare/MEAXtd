@@ -7,9 +7,8 @@ def raster_plot(data):
     num_spikes = 0
     for signal_id in range(0, num_signals):
         num_spikes += len(data.spikes[signal_id])
+    scatter = pg.ScatterPlotItem(size=2, brush=pg.mkBrush('k'))
     nodes = np.empty([num_spikes, 2])
-    edges = np.empty([num_spikes, 2], dtype=int)
-    g = pg.GraphItem()
     node_id = 0
     for signal_id in range(0, num_signals):
         curr_spikes = data.spikes[signal_id]
@@ -17,8 +16,9 @@ def raster_plot(data):
             nodes[node_id, 0] = data.time[curr_spike]
             nodes[node_id, 1] = signal_id + 1
             node_id += 1
-    g.setData(pos=nodes, adj=edges, symbolBrush=pg.mkBrush('k'), size=2)
-    return g
+    spots = [{'pos': nodes[i, :], 'data': 1} for i in range(num_spikes)] + [{'pos': [0, 0], 'data': 1}]
+    scatter.addPoints(spots)
+    return scatter
 
 
 def tsr_plot(data):

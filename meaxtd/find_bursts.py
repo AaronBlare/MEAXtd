@@ -4,6 +4,7 @@ from intervaltree import IntervalTree
 
 
 def find_spikes(data, method, coefficient, progress_callback):
+    #import pydevd; pydevd.settrace(suspend=False, trace_only_current_thread=True)
     num_signals = data.stream.shape[1]
     total_time_in_ms = int(np.ceil(data.time[-1] * 1000))
     data.TSR = np.zeros(int(total_time_in_ms / 50), dtype=int)
@@ -12,16 +13,16 @@ def find_spikes(data, method, coefficient, progress_callback):
         progress_callback.emit(round(signal_id * 30 / num_signals))
         if method == 'Median':
             noise_mad = np.median(np.absolute(data.stream[:, signal_id])) / 0.6745
-            crossings = detect_threshold_crossings(data.stream[:, signal_id], data.fs, coefficient * noise_mad, 0.002)
+            crossings = detect_threshold_crossings(data.stream[:, signal_id], data.fs, coefficient * noise_mad, 0.001)
         elif method == 'RMS':
             noise_rms = np.sqrt(np.mean(data.stream[:, signal_id] ** 2))
-            crossings = detect_threshold_crossings(data.stream[:, signal_id], data.fs, coefficient * noise_rms, 0.002)
+            crossings = detect_threshold_crossings(data.stream[:, signal_id], data.fs, coefficient * noise_rms, 0.001)
         elif method == 'std':
             noise_std = np.std(data.stream[:, signal_id])
-            crossings = detect_threshold_crossings(data.stream[:, signal_id], data.fs, coefficient * noise_std, 0.002)
+            crossings = detect_threshold_crossings(data.stream[:, signal_id], data.fs, coefficient * noise_std, 0.001)
 
-        spikes = get_spike_peaks(data.stream[:, signal_id], data.fs, crossings, 0.002)
-        spikes_ends, spikes_maxima = get_spike_ends(data.stream[:, signal_id], data.fs, crossings, 0.002)
+        spikes = get_spike_peaks(data.stream[:, signal_id], data.fs, crossings, 0.001)
+        spikes_ends, spikes_maxima = get_spike_ends(data.stream[:, signal_id], data.fs, crossings, 0.001)
         spikes_amplitudes = [
             data.stream[:, signal_id][spikes_maxima[spike_id]] - data.stream[:, signal_id][spikes[spike_id]]
             for spike_id in range(0, len(spikes))]
