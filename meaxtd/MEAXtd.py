@@ -8,9 +8,9 @@ from meaxtd.read_h5 import read_h5_file
 from meaxtd.hdf5plot import HDF5PlotXY
 from meaxtd.find_bursts import find_spikes, find_bursts, calculate_characteristics, save_tables_to_file
 from meaxtd.stat_plots import raster_plot, tsr_plot, colormap_plot
-from PySide6.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal
-from PySide6.QtGui import QIcon, QFont, QAction, QScreen
-from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QLayout, QFrame, QSizePolicy,
+from PySide2.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal
+from PySide2.QtGui import QIcon, QFont, QScreen
+from PySide2.QtWidgets import (QApplication, QDialog, QFileDialog, QLayout, QFrame, QSizePolicy, QAction,
                                QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget, QTabWidget,
                                QGroupBox, QGridLayout, QPushButton, QComboBox, QRadioButton, QPlainTextEdit,
                                QProgressBar, QDoubleSpinBox, QSpinBox, QTableWidget, QTableWidgetItem, QHeaderView)
@@ -161,7 +161,8 @@ class MEAXtd(QMainWindow):
 
     def center(self):
         frame_gm = self.frameGeometry()
-        center_point = QScreen.availableGeometry(QApplication.primaryScreen()).center()
+        screen = QApplication.desktop().screenNumber(QApplication.desktop().cursor().pos())
+        center_point = QApplication.desktop().screenGeometry(screen).center()
         frame_gm.moveCenter(center_point)
         self.move(frame_gm.topLeft())
 
