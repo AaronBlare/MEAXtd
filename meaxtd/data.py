@@ -23,7 +23,7 @@ class Data:
         self.burst_borders = {}
         self.global_characteristics = {}
         self.channel_characteristics = {}
-        self.other_characteristics = {}
+        self.burst_characteristics = {}
 
     def clear_calculated(self):
         self.spikes = {}

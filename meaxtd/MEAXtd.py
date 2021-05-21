@@ -408,6 +408,17 @@ class MEAXtd(QMainWindow):
                         str(self.data.channel_characteristics[key][signal_id])))
             self.char_channel_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
+        if self.data.burst_characteristics:
+            headers = list(self.data.burst_characteristics.keys())
+            self.char_burst_table.setColumnCount(len(headers))
+            self.char_burst_table.setRowCount(len(self.data.bursts))
+            self.char_burst_table.setHorizontalHeaderLabels(headers)
+            for burst_id in range(0, len(self.data.bursts)):
+                for n, key in enumerate(self.data.burst_characteristics):
+                    self.char_burst_table.setItem(burst_id, n, QTableWidgetItem(
+                        str(self.data.burst_characteristics[key][burst_id])))
+            self.char_burst_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
         self.path_to_save = save_tables_to_file(self.data, self.filename, spike_method, spike_coeff, burst_window,
                                                 burst_num_channels, progress_callback)
 
@@ -712,6 +723,7 @@ class MEAXtd(QMainWindow):
         size_policy_char_right_flag = self.char_burst_table.sizePolicy().hasHeightForWidth()
         size_policy_char_right.setHeightForWidth(size_policy_char_right_flag)
         self.char_burst_table.setSizePolicy(size_policy_char_right)
+        self.char_burst_table.verticalHeader().setVisible(False)
         self.char_tab_layout.addWidget(self.char_burst_table, 1, 3, 1, 1)
 
         self.char_global_label = QLabel(text="Global characteristics")

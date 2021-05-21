@@ -268,8 +268,6 @@ def calculate_characteristics(data, progress_callback):
     mean_num_spikes_time_bin = np.mean(data.TSR)
     std_num_spikes_time_bin = np.std(data.TSR)
 
-    progress_callback.emit(82)
-
     data.global_characteristics['Total number of spikes'] = total_num_spikes
     data.global_characteristics['Num spikes per second'] = num_spikes_per_second
     data.global_characteristics['Num spikes per ms'] = num_spikes_per_ms
@@ -285,7 +283,7 @@ def calculate_characteristics(data, progress_callback):
     data.global_characteristics['Mean number of spikes in time bin'] = mean_num_spikes_time_bin
     data.global_characteristics['Std number of spikes in time bin'] = std_num_spikes_time_bin
 
-    progress_callback.emit(84)
+    progress_callback.emit(83)
 
     num_spikes = []
     for signal_id in range(0, num_signals):
@@ -296,13 +294,46 @@ def calculate_characteristics(data, progress_callback):
         firing_rate.append(num_spikes[signal_id] / num_seconds)
         firing_rate_ms.append(num_spikes[signal_id] / (num_seconds * 1000))
 
-    progress_callback.emit(86)
-
     data.channel_characteristics['Channel'] = [i + 1 for i in range(0, num_signals)]
     data.channel_characteristics['Number of spikes'] = num_spikes
     data.channel_characteristics['Num spikes per second'] = firing_rate
     data.channel_characteristics['Num spikes per ms'] = firing_rate_ms
     data.channel_characteristics['Burst activation mean'] = data.burst_activation
+
+    progress_callback.emit(86)
+
+    bursts_starts = []
+    bursts_ends = []
+    signals = []
+    num_signals = []
+    for burst_id in range(0, len(data.bursts)):
+        curr_burst = data.bursts[burst_id]
+        activation_time = len(data.time)
+        deactivation_time = 0
+        signal_list = []
+        for interval in curr_burst:
+            if interval.begin < activation_time:
+                activation_time = interval.begin
+            if interval.end > deactivation_time:
+                deactivation_time = interval.end
+            signal_id = interval.data['signal_id']
+            signal_list.append(signal_id + 1)
+        bursts_starts.append(data.time[activation_time])
+        bursts_ends.append(data.time[deactivation_time])
+        signal_set = list(set(signal_list))
+        num_signals.append(len(signal_set))
+        signal_set.sort()
+        signals.append('; '.join([str(item) for item in signal_set]))
+    bursts_duration = []
+    for burst_id in range(0, len(bursts_starts)):
+        bursts_duration.append(bursts_ends[burst_id] - bursts_starts[burst_id])
+
+    data.burst_characteristics['Burst ID'] = [i + 1 for i in range(0, len(data.bursts))]
+    data.burst_characteristics['Start'] = bursts_starts
+    data.burst_characteristics['End'] = bursts_ends
+    data.burst_characteristics['Duration'] = bursts_duration
+    data.burst_characteristics['Number of channels'] = num_signals
+    data.burst_characteristics['Channels'] = signals
 
     progress_callback.emit(90)
 
@@ -331,6 +362,17 @@ def save_tables_to_file(data, filepath, spike_method, spike_coeff, burst_window,
         curr_row = []
         for key in data.channel_characteristics:
             curr_row.append(str(data.channel_characteristics[key][signal_id]))
+        f.write('\t'.join(curr_row) + '\n')
+    f.close()
+
+    progress_callback.emit(96)
+
+    f = open(path + 'burst.txt', 'w')
+    f.write('\t'.join(list(data.burst_characteristics.keys())) + '\n')
+    for burst_id in range(0, len(data.bursts)):
+        curr_row = []
+        for key in data.burst_characteristics:
+            curr_row.append(str(data.burst_characteristics[key][burst_id]))
         f.write('\t'.join(curr_row) + '\n')
     f.close()
 
