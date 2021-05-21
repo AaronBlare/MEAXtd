@@ -366,6 +366,7 @@ class MEAXtd(QMainWindow):
         spike_coeff = self.spike_coeff.value()
         self.logger.info("Spikes and bursts finding...")
         find_spikes(self.data, spike_method, spike_coeff, progress_callback)
+
         if self.data.spikes:
             self.logger.info("Spikes found.")
             self.highlight_none_rb.setCheckable(True)
@@ -373,9 +374,11 @@ class MEAXtd(QMainWindow):
             self.highlight_spike_rb.setCheckable(True)
             self.stat.plot_raster(self.stat_left_groupbox_layout)
             self.stat.plot_tsr(self.stat_left_groupbox_layout)
+
         burst_window = self.burst_window_size.value()
         burst_num_channels = self.burst_num_channels.value()
         find_bursts(self.data, spike_method, spike_coeff, burst_window, burst_num_channels, progress_callback)
+
         if self.data.bursts:
             self.logger.info("Bursts found.")
             self.highlight_none_rb.setCheckable(True)
@@ -384,14 +387,27 @@ class MEAXtd(QMainWindow):
             self.highlight_burstlet_rb.setCheckable(True)
             self.highlight_burst_rb.setCheckable(True)
             self.stat.plot_colormap(self.stat_right_groupbox_layout)
+
         self.logger.info("Characteristics calculating...")
         calculate_characteristics(self.data, progress_callback)
+
         if self.data.global_characteristics:
             self.logger.info("Characteristics calculated.")
             self.char_global_table.setRowCount(len(list(self.data.global_characteristics.keys())))
             for n, key in enumerate(self.data.global_characteristics):
                 self.char_global_table.setItem(n, 0, QTableWidgetItem(key))
                 self.char_global_table.setItem(n, 1, QTableWidgetItem(str(self.data.global_characteristics[key])))
+
+        if self.data.channel_characteristics:
+            headers = list(self.data.channel_characteristics.keys())
+            self.char_channel_table.setColumnCount(len(headers))
+            self.char_channel_table.setHorizontalHeaderLabels(headers)
+            for signal_id in range(0, self.data.stream.shape[1]):
+                for n, key in enumerate(self.data.channel_characteristics):
+                    self.char_channel_table.setItem(signal_id, n, QTableWidgetItem(
+                        str(self.data.channel_characteristics[key][signal_id])))
+            self.char_channel_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
         self.path_to_save = save_tables_to_file(self.data, self.filename, spike_method, spike_coeff, burst_window,
                                                 burst_num_channels, progress_callback)
 
@@ -675,6 +691,7 @@ class MEAXtd(QMainWindow):
         self.char_global_table.setHorizontalHeaderLabels(headers)
         self.char_global_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.char_global_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.char_global_table.verticalHeader().setVisible(False)
         self.char_tab_layout.addWidget(self.char_global_table, 1, 0, 1, 1)
 
         self.char_channel_table = QTableWidget(self.char_tab)
@@ -684,7 +701,9 @@ class MEAXtd(QMainWindow):
         size_policy_char_center_flag = self.char_channel_table.sizePolicy().hasHeightForWidth()
         size_policy_char_center.setHeightForWidth(size_policy_char_center_flag)
         self.char_channel_table.setSizePolicy(size_policy_char_center)
-        self.char_tab_layout.addWidget(self.char_channel_table, 1, 2, 3, 1)
+        self.char_channel_table.setRowCount(60)
+        self.char_channel_table.verticalHeader().setVisible(False)
+        self.char_tab_layout.addWidget(self.char_channel_table, 1, 2, 1, 1)
 
         self.char_burst_table = QTableWidget(self.char_tab)
         size_policy_char_right = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)

@@ -285,6 +285,25 @@ def calculate_characteristics(data, progress_callback):
     data.global_characteristics['Mean number of spikes in time bin'] = mean_num_spikes_time_bin
     data.global_characteristics['Std number of spikes in time bin'] = std_num_spikes_time_bin
 
+    progress_callback.emit(84)
+
+    num_spikes = []
+    for signal_id in range(0, num_signals):
+        num_spikes.append(len(data.spikes[signal_id]))
+    firing_rate = []
+    firing_rate_ms = []
+    for signal_id in range(0, num_signals):
+        firing_rate.append(num_spikes[signal_id] / num_seconds)
+        firing_rate_ms.append(num_spikes[signal_id] / (num_seconds * 1000))
+
+    progress_callback.emit(86)
+
+    data.channel_characteristics['Channel'] = [i + 1 for i in range(0, num_signals)]
+    data.channel_characteristics['Number of spikes'] = num_spikes
+    data.channel_characteristics['Num spikes per second'] = firing_rate
+    data.channel_characteristics['Num spikes per ms'] = firing_rate_ms
+    data.channel_characteristics['Burst activation mean'] = data.burst_activation
+
     progress_callback.emit(90)
 
 
@@ -297,10 +316,23 @@ def save_tables_to_file(data, filepath, spike_method, spike_coeff, burst_window,
     path = f"{path}/characteristics_{suffix}/"
     if not os.path.isdir(path):
         os.mkdir(path)
+
     f = open(path + 'global.txt', 'w')
     f.write('Characteristic\tValue\n')
     for key in data.global_characteristics:
         f.write(key + '\t' + str(data.global_characteristics[key]) + '\n')
     f.close()
+
+    progress_callback.emit(93)
+
+    f = open(path + 'channel.txt', 'w')
+    f.write('\t'.join(list(data.channel_characteristics.keys())) + '\n')
+    for signal_id in range(0, data.stream.shape[1]):
+        curr_row = []
+        for key in data.channel_characteristics:
+            curr_row.append(str(data.channel_characteristics[key][signal_id]))
+        f.write('\t'.join(curr_row) + '\n')
+    f.close()
+
     progress_callback.emit(100)
     return path
