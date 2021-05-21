@@ -167,13 +167,13 @@ class MEAXtd(QMainWindow):
         self.move(frame_gm.topLeft())
 
     def clear_all(self):
-        self.create_char_layout()
         self.highlight_none_rb.setCheckable(False)
         self.highlight_spike_rb.setCheckable(False)
         self.highlight_burstlet_rb.setCheckable(False)
         self.highlight_burst_rb.setCheckable(False)
         self.plot_navigation_back_button.setEnabled(False)
         self.plot_navigation_next_button.setEnabled(False)
+        self.plot.remove_data(self.plot_grid)
         self.stat.remove_plots(self.stat_left_groupbox_layout, self.stat_right_groupbox_layout)
         self.create_char_layout()
 
@@ -233,6 +233,7 @@ class MEAXtd(QMainWindow):
             if getattr(self, 'data', None) is not None:
                 self.data.clear_calculated()
                 self.clear_all()
+                self.plot.remove_signals(self.plot_grid)
             self.logger.info(f"File {filename} loading...")
             worker = Worker(self.read_h5_data, filename=filename)
             worker.signals.result.connect(self.set_data)
@@ -864,6 +865,14 @@ class PlotDialog(QDialog):
                     for row_id in range(0, num_rows):
                         curr_plot_item = plot_grid.layout().itemAtPosition(col_id, row_id).widget().plotItem
                         curr_plot_item.removeItem(curr_plot_item.curves[curve_id])
+
+    def remove_signals(self, plot_grid):
+        num_rows = 10
+        num_columns = 6
+        for col_id in range(0, num_columns):
+            for row_id in range(0, num_rows):
+                curr_plot_item = plot_grid.layout().itemAtPosition(col_id, row_id).widget().plotItem
+                curr_plot_item.removeItem(curr_plot_item.curves[0])
 
     def add_spike_data(self, plot_grid):
         num_rows = 10
