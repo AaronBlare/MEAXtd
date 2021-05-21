@@ -2,6 +2,7 @@ import sys
 import traceback
 import pkg_resources
 import pyqtgraph as pg
+import numpy as np
 import logging
 from meaxtd.read_h5 import read_h5_file
 from meaxtd.hdf5plot import HDF5PlotXY
@@ -164,6 +165,17 @@ class MEAXtd(QMainWindow):
         frame_gm.moveCenter(center_point)
         self.move(frame_gm.topLeft())
 
+    def clear_all(self):
+        self.create_char_layout()
+        self.highlight_none_rb.setCheckable(False)
+        self.highlight_spike_rb.setCheckable(False)
+        self.highlight_burstlet_rb.setCheckable(False)
+        self.highlight_burst_rb.setCheckable(False)
+        self.plot_navigation_back_button.setEnabled(False)
+        self.plot_navigation_next_button.setEnabled(False)
+        self.stat.remove_plots(self.stat_left_groupbox_layout, self.stat_right_groupbox_layout)
+        self.create_char_layout()
+
     def file_menu(self):
         """Create a file submenu with an Open File item that opens a file dialog."""
         self.file_sub_menu = self.menu_bar.addMenu('File')
@@ -217,6 +229,9 @@ class MEAXtd(QMainWindow):
         self.filename = filename
 
         if accepted:
+            if getattr(self, 'data', None) is not None:
+                self.data.clear_calculated()
+                self.clear_all()
             self.logger.info(f"File {filename} loading...")
             worker = Worker(self.read_h5_data, filename=filename)
             worker.signals.result.connect(self.set_data)
@@ -424,10 +439,12 @@ class MEAXtd(QMainWindow):
 
     def save_characteristics(self):
         self.logger.info(f"Characteristics saved to {self.path_to_save}")
+        self.param_change = False
 
     def process(self):
         if self.param_change:
             self.data.clear_calculated()
+            self.clear_all()
         if not self.data.spikes:
             worker = Worker(self.process_all)
             worker.signals.finished.connect(self.save_characteristics)
@@ -1077,13 +1094,32 @@ class StatDialog(QDialog):
         left_layout.layout().itemAtPosition(1, 0).widget().addItem(tplot)
 
     def plot_colormap(self, right_layout):
-        act_plot, act_bar = colormap_plot(self.data.burst_activation)
+        cm = pg.colormap.get('CET-R4')
+        act_max_value = np.max(self.data.burst_activation)
+        act_plot = colormap_plot(self.data.burst_activation)
         right_layout.layout().itemAtPosition(0, 0).widget().addItem(act_plot)
+        if right_layout.layout().itemAtPosition(0, 0).widget().plotItem.layout.itemAt(2, 5):
+            act_bar = right_layout.layout().itemAtPosition(0, 0).widget().plotItem.layout.itemAt(2, 5)
+            act_bar.setLevels(values=(0, act_max_value))
+        else:
+            act_bar = pg.ColorBarItem(interactive=False, values=(0, act_max_value), cmap=cm, label="Spike times, s")
         act_bar.setImageItem(act_plot, insert_in=right_layout.layout().itemAtPosition(0, 0).widget().plotItem)
 
-        deact_plot, deact_bar = colormap_plot(self.data.burst_deactivation)
+        deact_max_value = np.max(self.data.burst_deactivation)
+        deact_plot = colormap_plot(self.data.burst_deactivation)
         right_layout.layout().itemAtPosition(1, 0).widget().addItem(deact_plot)
+        if right_layout.layout().itemAtPosition(1, 0).widget().plotItem.layout.itemAt(2, 5):
+            deact_bar = right_layout.layout().itemAtPosition(1, 0).widget().plotItem.layout.itemAt(2, 5)
+            deact_bar.setLevels(values=(0, deact_max_value))
+        else:
+            deact_bar = pg.ColorBarItem(interactive=False, values=(0, deact_max_value), cmap=cm, label="Spike times, s")
         deact_bar.setImageItem(deact_plot, insert_in=right_layout.layout().itemAtPosition(1, 0).widget().plotItem)
+
+    def remove_plots(self, left_layout, right_layout):
+        left_layout.layout().itemAtPosition(0, 0).widget().clear()
+        left_layout.layout().itemAtPosition(1, 0).widget().clear()
+        right_layout.layout().itemAtPosition(0, 0).widget().clear()
+        right_layout.layout().itemAtPosition(1, 0).widget().clear()
 
 
 def main(args=sys.argv):

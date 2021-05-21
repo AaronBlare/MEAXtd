@@ -1,4 +1,4 @@
-pytest==6.2.2
+pytest==6.2.3
 pytest-qt==3.3.0
 coverage==5.5
 PyVirtualDisplay==2.1
