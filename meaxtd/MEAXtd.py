@@ -937,7 +937,7 @@ class PlotDialog(QDialog):
             else:
                 if self.burstlet_id < len(self.data.burstlets[curr_signal]) - 1:
                     self.burstlet_id += 1
-            if curr_signal in self.data.burstlets and self.data.burstlets[curr_signal].size > 0:
+            if curr_signal in self.data.burstlets and len(self.data.burstlets[curr_signal]) > 0:
                 curr_burstlet = self.data.burstlets[curr_signal][self.burstlet_id]
                 curr_burstlet_start = self.data.burstlets_starts[curr_signal][self.burstlet_id]
                 curr_burstlet_end = self.data.burstlets_ends[curr_signal][self.burstlet_id]
@@ -960,7 +960,7 @@ class PlotDialog(QDialog):
             else:
                 if self.burst_id < len(self.data.bursts_starts[curr_signal]) - 1:
                     self.burst_id += 1
-            if curr_signal in self.data.bursts_starts and self.data.bursts_starts[curr_signal].size > 0:
+            if curr_signal in self.data.bursts_starts and len(self.data.bursts_starts[curr_signal]) > 0:
                 curr_burst_start = self.data.bursts_starts[curr_signal][self.burst_id]
                 curr_burst_end = self.data.bursts_ends[curr_signal][self.burst_id]
                 curr_burst_len = self.data.time[curr_burst_end] - self.data.time[curr_burst_start]
@@ -996,7 +996,7 @@ class PlotDialog(QDialog):
             else:
                 if self.burstlet_id > 0:
                     self.burstlet_id -= 1
-            if curr_signal in self.data.burstlets and self.data.burstlets[curr_signal].size > 0:
+            if curr_signal in self.data.burstlets and len(self.data.burstlets[curr_signal]) > 0:
                 curr_burstlet = self.data.burstlets[curr_signal][self.burstlet_id]
                 curr_burstlet_start = self.data.burstlets_starts[curr_signal][self.burstlet_id]
                 curr_burstlet_end = self.data.burstlets_ends[curr_signal][self.burstlet_id]
@@ -1019,7 +1019,7 @@ class PlotDialog(QDialog):
             else:
                 if self.burst_id > 0:
                     self.burst_id -= 1
-            if curr_signal in self.data.bursts_starts and self.data.bursts_starts[curr_signal].size > 0:
+            if curr_signal in self.data.bursts_starts and len(self.data.bursts_starts[curr_signal]) > 0:
                 curr_burst_start = self.data.bursts_starts[curr_signal][self.burst_id]
                 curr_burst_end = self.data.bursts_ends[curr_signal][self.burst_id]
                 curr_burst_len = self.data.time[curr_burst_end] - self.data.time[curr_burst_start]
