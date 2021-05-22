@@ -959,7 +959,7 @@ class PlotDialog(QDialog):
             if getattr(self, 'burst_id', None) is None:
                 self.burst_id = 0
             else:
-                if self.burst_id < len(self.data.bursts) - 1:
+                if self.burst_id < len(self.data.bursts_starts[curr_signal]) - 1:
                     self.burst_id += 1
             if self.data.bursts_starts[curr_signal]:
                 curr_burst_start = self.data.bursts_starts[curr_signal][self.burst_id]
