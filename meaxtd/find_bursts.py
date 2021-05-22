@@ -4,7 +4,6 @@ from intervaltree import IntervalTree
 
 
 def find_spikes(data, method, coefficient, progress_callback):
-    #import pydevd; pydevd.settrace(suspend=False, trace_only_current_thread=True)
     num_signals = data.stream.shape[1]
     total_time_in_ms = int(np.ceil(data.time[-1] * 1000))
     data.TSR = np.zeros(int(total_time_in_ms / 50), dtype=int)
