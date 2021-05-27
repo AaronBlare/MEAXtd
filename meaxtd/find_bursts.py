@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
+import datetime
 from intervaltree import IntervalTree
 
 
@@ -280,7 +281,7 @@ def calculate_characteristics(data, progress_callback):
     data.global_characteristics['Mean number of spikes in time bin'] = mean_num_spikes_time_bin
     data.global_characteristics['Std number of spikes in time bin'] = std_num_spikes_time_bin
 
-    progress_callback.emit(83)
+    progress_callback.emit(82)
 
     num_spikes = []
     for signal_id in range(0, num_signals):
@@ -297,13 +298,14 @@ def calculate_characteristics(data, progress_callback):
     data.channel_characteristics['Num spikes per ms'] = firing_rate_ms
     data.channel_characteristics['Burst activation mean'] = data.burst_activation
 
-    progress_callback.emit(86)
+    progress_callback.emit(85)
 
     bursts_starts = []
     bursts_ends = []
     signals = []
-    num_signals = []
+    num_channels = []
     num_spikes_per_burst = []
+    num_bursts_per_channel = [0] * 60
     for burst_id in range(0, len(data.bursts)):
         curr_burst = data.bursts[burst_id]
         activation_time = len(data.time)
@@ -317,19 +319,22 @@ def calculate_characteristics(data, progress_callback):
                 deactivation_time = interval.end
             signal_id = interval.data['signal_id']
             signal_list.append(signal_id + 1)
+            num_bursts_per_channel[signal_id] += 1
             burstlet_id = interval.data['burstlet_id']
             curr_burstlet = data.burstlets[signal_id][burstlet_id]
             curr_num_spikes += len(curr_burstlet)
         bursts_starts.append(data.time[activation_time])
         bursts_ends.append(data.time[deactivation_time])
         signal_set = list(set(signal_list))
-        num_signals.append(len(signal_set))
+        num_channels.append(len(signal_set))
         signal_set.sort()
         signals.append('; '.join([str(item) for item in signal_set]))
         num_spikes_per_burst.append(curr_num_spikes)
     bursts_duration = []
     for burst_id in range(0, len(bursts_starts)):
         bursts_duration.append(bursts_ends[burst_id] - bursts_starts[burst_id])
+
+    data.channel_characteristics['Num bursts'] = num_bursts_per_channel
 
     burst_type = []
     for burst_num_spikes in num_spikes_per_burst:
@@ -344,7 +349,7 @@ def calculate_characteristics(data, progress_callback):
     data.burst_characteristics['Duration'] = bursts_duration
     data.burst_characteristics['Number of spikes'] = num_spikes_per_burst
     data.burst_characteristics['Burst type'] = burst_type
-    data.burst_characteristics['Number of channels'] = num_signals
+    data.burst_characteristics['Number of channels'] = num_channels
     data.burst_characteristics['Channels'] = signals
 
     num_small_bursts = 0
@@ -358,6 +363,33 @@ def calculate_characteristics(data, progress_callback):
     data.global_characteristics['Number of small bursts'] = num_small_bursts
     data.global_characteristics['Number of large bursts'] = num_large_bursts
     data.global_characteristics['Mean burst duration'] = np.mean(bursts_duration)
+
+    progress_callback.emit(87)
+
+    num_minutes = num_seconds / 60
+    starts = []
+    finishes = []
+    for time_id in range(0, int(num_minutes + 1)):
+        starts.append(str(datetime.timedelta(seconds=time_id * 60)))
+        finishes.append(str(datetime.timedelta(seconds=(time_id + 1) * 60)))
+    finishes[-1] = str(datetime.timedelta(seconds=num_seconds))
+
+    num_bursts_each_minute = [0] * int(num_minutes + 1)
+    for burst_start in bursts_starts:
+        minute_id = int(burst_start / 60)
+        num_bursts_each_minute[minute_id] += 1
+
+    num_spikes_each_minute = [0] * int(num_minutes + 1)
+    for signal_id in range(0, num_signals):
+        for spike in data.spikes[signal_id]:
+            spike_time = data.time[spike]
+            minute_id = int(spike_time / 60)
+            num_spikes_each_minute[minute_id] += 1
+
+    data.time_characteristics['Start'] = starts
+    data.time_characteristics['End'] = finishes
+    data.time_characteristics['Num bursts per minute'] = num_bursts_each_minute
+    data.time_characteristics['Num spikes per minute'] = num_spikes_each_minute
 
     progress_callback.emit(90)
 
@@ -375,15 +407,20 @@ def save_tables_to_file(data, filepath, spike_method, spike_coeff, burst_window,
     global_df = pd.DataFrame(data=data.global_characteristics, index=[0])
     global_df.to_excel(path + 'global.xlsx', index=False)
 
-    progress_callback.emit(93)
+    progress_callback.emit(92)
 
     channel_df = pd.DataFrame(data=data.channel_characteristics)
     channel_df.to_excel(path + 'channel.xlsx', index=False)
 
-    progress_callback.emit(96)
+    progress_callback.emit(95)
 
     burst_df = pd.DataFrame(data=data.burst_characteristics)
     burst_df.to_excel(path + 'burst.xlsx', index=False)
+
+    progress_callback.emit(97)
+
+    time_df = pd.DataFrame(data=data.time_characteristics)
+    time_df.to_excel(path + 'time.xlsx', index=False)
 
     progress_callback.emit(100)
     return path
