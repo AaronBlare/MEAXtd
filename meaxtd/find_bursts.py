@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import pandas as pd
 from intervaltree import IntervalTree
 
 
@@ -371,33 +372,18 @@ def save_tables_to_file(data, filepath, spike_method, spike_coeff, burst_window,
     if not os.path.isdir(path):
         os.mkdir(path)
 
-    f = open(path + 'global.txt', 'w')
-    f.write('Characteristic\tValue\n')
-    for key in data.global_characteristics:
-        f.write(key + '\t' + str(data.global_characteristics[key]) + '\n')
-    f.close()
+    global_df = pd.DataFrame(data=data.global_characteristics, index=[0])
+    global_df.to_excel(path + 'global.xlsx', index=False)
 
     progress_callback.emit(93)
 
-    f = open(path + 'channel.txt', 'w')
-    f.write('\t'.join(list(data.channel_characteristics.keys())) + '\n')
-    for signal_id in range(0, data.stream.shape[1]):
-        curr_row = []
-        for key in data.channel_characteristics:
-            curr_row.append(str(data.channel_characteristics[key][signal_id]))
-        f.write('\t'.join(curr_row) + '\n')
-    f.close()
+    channel_df = pd.DataFrame(data=data.channel_characteristics)
+    channel_df.to_excel(path + 'channel.xlsx', index=False)
 
     progress_callback.emit(96)
 
-    f = open(path + 'burst.txt', 'w')
-    f.write('\t'.join(list(data.burst_characteristics.keys())) + '\n')
-    for burst_id in range(0, len(data.bursts)):
-        curr_row = []
-        for key in data.burst_characteristics:
-            curr_row.append(str(data.burst_characteristics[key][burst_id]))
-        f.write('\t'.join(curr_row) + '\n')
-    f.close()
+    burst_df = pd.DataFrame(data=data.burst_characteristics)
+    burst_df.to_excel(path + 'burst.xlsx', index=False)
 
     progress_callback.emit(100)
     return path
