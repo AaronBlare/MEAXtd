@@ -449,7 +449,7 @@ class MEAXtd(QMainWindow):
             self.char_time_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
         save_plots_to_file(self.filename, spike_method, spike_coeff, burst_window, burst_num_channels,
-                           progress_callback, self.stat_left_groupbox_layout, self.stat_right_groupbox_layout)
+                           progress_callback, self.stat_left_groupbox, self.stat_right_groupbox)
 
         self.path_to_save = save_tables_to_file(self.data, self.filename, spike_method, spike_coeff, burst_window,
                                                 burst_num_channels, progress_callback)

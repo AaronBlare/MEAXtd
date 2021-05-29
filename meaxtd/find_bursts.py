@@ -5,6 +5,7 @@ import pyqtgraph as pg
 import pyqtgraph.exporters
 import datetime
 from intervaltree import IntervalTree
+from PySide2.QtGui import QPixmap, QImage, QPainter
 
 
 def find_spikes(data, method, coefficient, progress_callback):
@@ -408,8 +409,8 @@ def save_plots_to_file(filepath, spike_method, spike_coeff, burst_window, burst_
 
     progress_callback.emit(91)
 
-    tsr_exporter_svg = pg.exporters.SVGExporter(left_layout.layout().itemAtPosition(0, 0).widget().getPlotItem())
-    tsr_exporter_svg.export(path + 'TSR.svg')
+    #tsr_exporter_svg = pg.exporters.SVGExporter(left_layout.layout().itemAtPosition(0, 0).widget().getPlotItem())
+    #tsr_exporter_svg.export(path + 'TSR.svg')
 
     tsr_exporter_png = pg.exporters.ImageExporter(left_layout.layout().itemAtPosition(0, 0).widget().getPlotItem())
     tsr_exporter_png.export(path + 'TSR.png')
@@ -424,22 +425,21 @@ def save_plots_to_file(filepath, spike_method, spike_coeff, burst_window, burst_
 
     progress_callback.emit(93)
 
-    act_exporter_svg = pg.exporters.SVGExporter(right_layout.layout().itemAtPosition(0, 0).widget().getPlotItem())
-    act_exporter_svg.export(path + 'activation.svg')
+    #act_exporter_svg = pg.exporters.SVGExporter(right_layout.layout().itemAtPosition(0, 0).widget().getPlotItem())
+    #act_exporter_svg.export(path + 'activation.svg')
 
     act_exporter_png = pg.exporters.ImageExporter(right_layout.layout().itemAtPosition(0, 0).widget().getPlotItem())
     act_exporter_png.export(path + 'activation.png')
 
     progress_callback.emit(94)
 
-    deact_exporter_svg = pg.exporters.SVGExporter(right_layout.layout().itemAtPosition(1, 0).widget().getPlotItem())
-    deact_exporter_svg.export(path + 'deactivation.svg')
+    #deact_exporter_svg = pg.exporters.SVGExporter(right_layout.layout().itemAtPosition(1, 0).widget().getPlotItem())
+    #deact_exporter_svg.export(path + 'deactivation.svg')
 
     deact_exporter_png = pg.exporters.ImageExporter(right_layout.layout().itemAtPosition(1, 0).widget().getPlotItem())
     deact_exporter_png.export(path + 'deactivation.png')
 
     progress_callback.emit(95)
-    return path
 
 
 def save_tables_to_file(data, filepath, spike_method, spike_coeff, burst_window, burst_num_channels, progress_callback):
