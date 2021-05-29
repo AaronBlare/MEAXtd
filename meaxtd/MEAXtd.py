@@ -6,7 +6,8 @@ import numpy as np
 import logging
 from meaxtd.read_h5 import read_h5_file
 from meaxtd.hdf5plot import HDF5PlotXY
-from meaxtd.find_bursts import find_spikes, find_bursts, calculate_characteristics, save_tables_to_file
+from meaxtd.find_bursts import find_spikes, find_bursts, calculate_characteristics, save_plots_to_file, \
+    save_tables_to_file
 from meaxtd.stat_plots import raster_plot, tsr_plot, colormap_plot
 from PySide2.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal
 from PySide2.QtGui import QIcon, QFont, QScreen
@@ -447,6 +448,9 @@ class MEAXtd(QMainWindow):
                         str(self.data.time_characteristics[key][minute_id])))
             self.char_time_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
+        save_plots_to_file(self.filename, spike_method, spike_coeff, burst_window, burst_num_channels,
+                           progress_callback, self.stat_left_groupbox_layout, self.stat_right_groupbox_layout)
+
         self.path_to_save = save_tables_to_file(self.data, self.filename, spike_method, spike_coeff, burst_window,
                                                 burst_num_channels, progress_callback)
 
@@ -705,6 +709,8 @@ class MEAXtd(QMainWindow):
         size_policy_stat_left.setHeightForWidth(size_policy_stat_left_flag)
         self.stat_left_groupbox.setSizePolicy(size_policy_stat_left)
         self.stat_left_groupbox_layout = QGridLayout(self.stat_left_groupbox)
+        self.stat_left_groupbox_layout.setHorizontalSpacing(0)
+        self.stat_left_groupbox_layout.setVerticalSpacing(2)
         self.stat_tab_layout.addWidget(self.stat_left_groupbox)
 
         self.stat_right_groupbox = QGroupBox(self.stat_tab)
@@ -1074,23 +1080,9 @@ class StatDialog(QDialog):
 
     def configure_left(self, left_layout):
 
-        r_plot = pg.PlotWidget()
-        r_plot.enableAutoRange(False, False)
-        r_plot.setXRange(0, 60)
-        r_plot.setYRange(0, 60.5)
-        r_plot.setLabel('left', 'Electrode')
-        r_plot.setLabel('bottom', 'Time (s)')
-        r_plot.setLimits(yMin=-1, yMax=62, minYRange=1)
-        if self.data:
-            if self.data.spikes:
-                rplot = raster_plot(self.data)
-                r_plot.addItem(rplot)
-        left_layout.addWidget(r_plot, 0, 0)
-
         t_plot = pg.PlotWidget()
         t_plot.enableAutoRange(False, False)
         t_plot.setXRange(0, 60)
-        r_plot.setYRange(0, 500)
         t_plot.setLabel('left', 'TSR, spikes per bin')
         t_plot.setLabel('bottom', 'Time (s)')
         t_plot.setLimits(yMin=-1, yMax=500, minYRange=1)
@@ -1098,8 +1090,21 @@ class StatDialog(QDialog):
             if self.data.spikes:
                 tplot = tsr_plot(self.data)
                 t_plot.addItem(tplot)
-        t_plot.getViewBox().setXLink(r_plot)
-        left_layout.addWidget(t_plot, 1, 0)
+        left_layout.addWidget(t_plot, 0, 0)
+
+        r_plot = pg.PlotWidget()
+        r_plot.enableAutoRange(False, False)
+        r_plot.setXRange(0, 60)
+        t_plot.setYRange(0, 60.5)
+        r_plot.setLabel('left', 'Electrode')
+        r_plot.setLabel('bottom', 'Time (s)')
+        r_plot.setLimits(yMin=0, yMax=62, minYRange=1)
+        if self.data:
+            if self.data.spikes:
+                rplot = raster_plot(self.data)
+                r_plot.addItem(rplot)
+        r_plot.getViewBox().setXLink(t_plot)
+        left_layout.addWidget(r_plot, 1, 0)
 
     def configure_right(self, right_layout):
 
@@ -1121,12 +1126,18 @@ class StatDialog(QDialog):
 
     def plot_raster(self, left_layout):
         rplot = raster_plot(self.data)
-        left_layout.layout().itemAtPosition(0, 0).widget().addItem(rplot)
+        left_layout.layout().itemAtPosition(1, 0).widget().addItem(rplot)
+        left_layout.layout().itemAtPosition(1, 0).widget().setLimits(xMin=0, xMax=self.data.time[-1])
+        left_layout.layout().itemAtPosition(1, 0).widget().setXRange(0, self.data.time[-1])
 
     def plot_tsr(self, left_layout):
         tplot = tsr_plot(self.data)
-        left_layout.layout().itemAtPosition(1, 0).widget().setLimits(yMin=-1, yMax=max(self.data.TSR) + 1)
-        left_layout.layout().itemAtPosition(1, 0).widget().addItem(tplot)
+        left_layout.layout().itemAtPosition(0, 0).widget().addItem(tplot)
+        left_layout.layout().itemAtPosition(0, 0).widget().setLimits(yMin=-3, yMax=max(self.data.TSR) + 1,
+                                                                     xMin=0, xMax=self.data.time[-1])
+        left_layout.layout().itemAtPosition(0, 0).widget().setYRange(-1, max(self.data.TSR) + 1)
+        left_layout.layout().itemAtPosition(0, 0).widget().setXRange(0, self.data.time[-1])
+        #left_layout.layout().itemAtPosition(0, 0).widget().getPlotItem().hideAxis('bottom')
 
     def plot_colormap(self, right_layout):
         cm = pg.colormap.get('CET-R4')
