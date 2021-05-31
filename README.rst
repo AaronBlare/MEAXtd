@@ -13,7 +13,7 @@ MEA MultiChannel signal analysis
 Файл \*.exe
 -----------
 
-Файл MEAXtd.exe с первой версией программы доступен по ссылке: https://github.com/AaronBlare/MEAXtd/releases/tag/v0.1
+Файл MEAXtd.exe с первой версией программы доступен по ссылке: https://github.com/AaronBlare/MEAXtd/releases
 
 Его наобходимо скачать и запустить. Загрузка программы может занять несколько секунд.
 
