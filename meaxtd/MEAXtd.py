@@ -6,7 +6,8 @@ import numpy as np
 import logging
 from meaxtd.read_h5 import read_h5_file
 from meaxtd.hdf5plot import HDF5PlotXY
-from meaxtd.find_bursts import find_spikes, find_bursts, calculate_characteristics, save_tables_to_file
+from meaxtd.find_bursts import find_spikes, find_bursts, calculate_characteristics, save_tables_to_file, \
+    save_plots_to_file
 from meaxtd.stat_plots import raster_plot, tsr_plot, colormap_plot
 from PySide6.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal
 from PySide6.QtGui import QIcon, QFont, QAction, QScreen
@@ -422,7 +423,7 @@ class MEAXtd(QMainWindow):
                 for n, key in enumerate(self.data.channel_characteristics):
                     self.char_channel_table.setItem(signal_id, n, QTableWidgetItem(
                         str(self.data.channel_characteristics[key][signal_id])))
-            self.char_channel_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            self.char_channel_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
 
         if self.data.burst_characteristics:
             headers = list(self.data.burst_characteristics.keys())
@@ -433,7 +434,22 @@ class MEAXtd(QMainWindow):
                 for n, key in enumerate(self.data.burst_characteristics):
                     self.char_burst_table.setItem(burst_id, n, QTableWidgetItem(
                         str(self.data.burst_characteristics[key][burst_id])))
-            self.char_burst_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            self.char_burst_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+
+        if self.data.time_characteristics:
+            headers = list(self.data.time_characteristics.keys())
+            self.char_time_table.setColumnCount(len(headers))
+            self.char_time_table.setRowCount(len(self.data.bursts))
+            self.char_time_table.setHorizontalHeaderLabels(headers)
+            for minute_id in range(0, len(self.data.time_characteristics['Start'])):
+                for n, key in enumerate(self.data.time_characteristics):
+                    self.char_time_table.setItem(minute_id, n, QTableWidgetItem(
+                        str(self.data.time_characteristics[key][minute_id])))
+            self.char_time_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        save_plots_to_file(self.filename, spike_method, spike_coeff, burst_window, burst_num_channels,
+                           progress_callback, self.stat_left_groupbox, self.stat_right_groupbox,
+                           self.stat_left_groupbox_layout)
 
         self.path_to_save = save_tables_to_file(self.data, self.filename, spike_method, spike_coeff, burst_window,
                                                 burst_num_channels, progress_callback)
@@ -693,6 +709,8 @@ class MEAXtd(QMainWindow):
         size_policy_stat_left.setHeightForWidth(size_policy_stat_left_flag)
         self.stat_left_groupbox.setSizePolicy(size_policy_stat_left)
         self.stat_left_groupbox_layout = QGridLayout(self.stat_left_groupbox)
+        self.stat_left_groupbox_layout.setHorizontalSpacing(0)
+        self.stat_left_groupbox_layout.setVerticalSpacing(2)
         self.stat_tab_layout.addWidget(self.stat_left_groupbox)
 
         self.stat_right_groupbox = QGroupBox(self.stat_tab)
@@ -725,7 +743,7 @@ class MEAXtd(QMainWindow):
 
         self.char_channel_table = QTableWidget(self.char_tab)
         size_policy_char_center = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        size_policy_char_center.setHorizontalStretch(3)
+        size_policy_char_center.setHorizontalStretch(2)
         size_policy_char_center.setVerticalStretch(0)
         size_policy_char_center_flag = self.char_channel_table.sizePolicy().hasHeightForWidth()
         size_policy_char_center.setHeightForWidth(size_policy_char_center_flag)
@@ -736,13 +754,23 @@ class MEAXtd(QMainWindow):
 
         self.char_burst_table = QTableWidget(self.char_tab)
         size_policy_char_right = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        size_policy_char_right.setHorizontalStretch(3)
+        size_policy_char_right.setHorizontalStretch(2)
         size_policy_char_right.setVerticalStretch(0)
         size_policy_char_right_flag = self.char_burst_table.sizePolicy().hasHeightForWidth()
         size_policy_char_right.setHeightForWidth(size_policy_char_right_flag)
         self.char_burst_table.setSizePolicy(size_policy_char_right)
         self.char_burst_table.verticalHeader().setVisible(False)
         self.char_tab_layout.addWidget(self.char_burst_table, 1, 3, 1, 1)
+
+        self.char_time_table = QTableWidget(self.char_tab)
+        size_policy_char_right = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        size_policy_char_right.setHorizontalStretch(2)
+        size_policy_char_right.setVerticalStretch(0)
+        size_policy_char_right_flag = self.char_time_table.sizePolicy().hasHeightForWidth()
+        size_policy_char_right.setHeightForWidth(size_policy_char_right_flag)
+        self.char_time_table.setSizePolicy(size_policy_char_right)
+        self.char_time_table.verticalHeader().setVisible(False)
+        self.char_tab_layout.addWidget(self.char_time_table, 1, 4, 1, 1)
 
         self.char_global_label = QLabel(text="Global characteristics")
         self.char_global_label.setFont(self.gbox_font)
@@ -755,6 +783,10 @@ class MEAXtd(QMainWindow):
         self.char_burst_label = QLabel(text="Burst characteristics")
         self.char_burst_label.setFont(self.gbox_font)
         self.char_tab_layout.addWidget(self.char_burst_label, 0, 3, 1, 1)
+
+        self.char_time_label = QLabel(text="Time characteristics")
+        self.char_time_label.setFont(self.gbox_font)
+        self.char_tab_layout.addWidget(self.char_time_label, 0, 4, 1, 1)
 
 
 class AboutDialog(QDialog):
@@ -1048,23 +1080,9 @@ class StatDialog(QDialog):
 
     def configure_left(self, left_layout):
 
-        r_plot = pg.PlotWidget()
-        r_plot.enableAutoRange(False, False)
-        r_plot.setXRange(0, 60)
-        r_plot.setYRange(0, 60.5)
-        r_plot.setLabel('left', 'Electrode')
-        r_plot.setLabel('bottom', 'Time (s)')
-        r_plot.setLimits(yMin=-1, yMax=62, minYRange=1)
-        if self.data:
-            if self.data.spikes:
-                rplot = raster_plot(self.data)
-                r_plot.addItem(rplot)
-        left_layout.addWidget(r_plot, 0, 0)
-
         t_plot = pg.PlotWidget()
         t_plot.enableAutoRange(False, False)
         t_plot.setXRange(0, 60)
-        r_plot.setYRange(0, 500)
         t_plot.setLabel('left', 'TSR, spikes per bin')
         t_plot.setLabel('bottom', 'Time (s)')
         t_plot.setLimits(yMin=-1, yMax=500, minYRange=1)
@@ -1072,8 +1090,21 @@ class StatDialog(QDialog):
             if self.data.spikes:
                 tplot = tsr_plot(self.data)
                 t_plot.addItem(tplot)
-        t_plot.getViewBox().setXLink(r_plot)
-        left_layout.addWidget(t_plot, 1, 0)
+        left_layout.addWidget(t_plot, 0, 0)
+
+        r_plot = pg.PlotWidget()
+        r_plot.enableAutoRange(False, False)
+        r_plot.setXRange(0, 60)
+        t_plot.setYRange(0, 60.5)
+        r_plot.setLabel('left', 'Electrode')
+        r_plot.setLabel('bottom', 'Time (s)')
+        r_plot.setLimits(yMin=0, yMax=62, minYRange=1)
+        if self.data:
+            if self.data.spikes:
+                rplot = raster_plot(self.data)
+                r_plot.addItem(rplot)
+        r_plot.getViewBox().setXLink(t_plot)
+        left_layout.addWidget(r_plot, 1, 0)
 
     def configure_right(self, right_layout):
 
@@ -1095,12 +1126,18 @@ class StatDialog(QDialog):
 
     def plot_raster(self, left_layout):
         rplot = raster_plot(self.data)
-        left_layout.layout().itemAtPosition(0, 0).widget().addItem(rplot)
+        left_layout.layout().itemAtPosition(1, 0).widget().addItem(rplot)
+        left_layout.layout().itemAtPosition(1, 0).widget().setLimits(xMin=0, xMax=self.data.time[-1])
+        left_layout.layout().itemAtPosition(1, 0).widget().setXRange(0, self.data.time[-1])
 
     def plot_tsr(self, left_layout):
         tplot = tsr_plot(self.data)
-        left_layout.layout().itemAtPosition(1, 0).widget().setLimits(yMin=-1, yMax=max(self.data.TSR) + 1)
-        left_layout.layout().itemAtPosition(1, 0).widget().addItem(tplot)
+        left_layout.layout().itemAtPosition(0, 0).widget().addItem(tplot)
+        left_layout.layout().itemAtPosition(0, 0).widget().setLimits(yMin=-3, yMax=max(self.data.TSR) + 1,
+                                                                     xMin=0, xMax=self.data.time[-1])
+        left_layout.layout().itemAtPosition(0, 0).widget().setYRange(-1, max(self.data.TSR) + 1)
+        left_layout.layout().itemAtPosition(0, 0).widget().setXRange(0, self.data.time[-1])
+        left_layout.layout().itemAtPosition(0, 0).widget().getPlotItem().hideAxis('bottom')
 
     def plot_colormap(self, right_layout):
         cm = pg.colormap.get('CET-R4')
