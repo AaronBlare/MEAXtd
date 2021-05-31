@@ -449,7 +449,8 @@ class MEAXtd(QMainWindow):
             self.char_time_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
         save_plots_to_file(self.filename, spike_method, spike_coeff, burst_window, burst_num_channels,
-                           progress_callback, self.stat_left_groupbox, self.stat_right_groupbox)
+                           progress_callback, self.stat_left_groupbox, self.stat_right_groupbox,
+                           self.stat_left_groupbox_layout)
 
         self.path_to_save = save_tables_to_file(self.data, self.filename, spike_method, spike_coeff, burst_window,
                                                 burst_num_channels, progress_callback)
@@ -1137,7 +1138,7 @@ class StatDialog(QDialog):
                                                                      xMin=0, xMax=self.data.time[-1])
         left_layout.layout().itemAtPosition(0, 0).widget().setYRange(-1, max(self.data.TSR) + 1)
         left_layout.layout().itemAtPosition(0, 0).widget().setXRange(0, self.data.time[-1])
-        #left_layout.layout().itemAtPosition(0, 0).widget().getPlotItem().hideAxis('bottom')
+        left_layout.layout().itemAtPosition(0, 0).widget().getPlotItem().hideAxis('bottom')
 
     def plot_colormap(self, right_layout):
         cm = pg.colormap.get('CET-R4')

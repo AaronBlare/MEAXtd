@@ -398,7 +398,7 @@ def calculate_characteristics(data, progress_callback):
 
 
 def save_plots_to_file(filepath, spike_method, spike_coeff, burst_window, burst_num_channels, progress_callback,
-                       left_layout, right_layout):
+                       left_groupbox, right_groupbox, left_layout):
     path = filepath[:-3]
     if not os.path.isdir(path):
         os.mkdir(path)
@@ -412,7 +412,7 @@ def save_plots_to_file(filepath, spike_method, spike_coeff, burst_window, burst_
     #tsr_exporter_svg = pg.exporters.SVGExporter(left_layout.layout().itemAtPosition(0, 0).widget().getPlotItem())
     #tsr_exporter_svg.export(path + 'TSR.svg')
 
-    tsr_exporter_png = pg.exporters.ImageExporter(left_layout.layout().itemAtPosition(0, 0).widget().getPlotItem())
+    tsr_exporter_png = pg.exporters.ImageExporter(left_groupbox.layout().itemAtPosition(0, 0).widget().getPlotItem())
     tsr_exporter_png.export(path + 'TSR.png')
 
     progress_callback.emit(92)
@@ -420,7 +420,7 @@ def save_plots_to_file(filepath, spike_method, spike_coeff, burst_window, burst_
     #plot_exporter_svg = pg.exporters.SVGExporter(left_layout.layout().itemAtPosition(1, 0).widget().getPlotItem())
     #plot_exporter_svg.export(path + 'plot.svg')
 
-    plot_exporter_png = pg.exporters.ImageExporter(left_layout.layout().itemAtPosition(1, 0).widget().getPlotItem())
+    plot_exporter_png = pg.exporters.ImageExporter(left_groupbox.layout().itemAtPosition(1, 0).widget().getPlotItem())
     plot_exporter_png.export(path + 'plot.png')
 
     progress_callback.emit(93)
@@ -428,7 +428,7 @@ def save_plots_to_file(filepath, spike_method, spike_coeff, burst_window, burst_
     #act_exporter_svg = pg.exporters.SVGExporter(right_layout.layout().itemAtPosition(0, 0).widget().getPlotItem())
     #act_exporter_svg.export(path + 'activation.svg')
 
-    act_exporter_png = pg.exporters.ImageExporter(right_layout.layout().itemAtPosition(0, 0).widget().getPlotItem())
+    act_exporter_png = pg.exporters.ImageExporter(right_groupbox.layout().itemAtPosition(0, 0).widget().getPlotItem())
     act_exporter_png.export(path + 'activation.png')
 
     progress_callback.emit(94)
@@ -436,10 +436,14 @@ def save_plots_to_file(filepath, spike_method, spike_coeff, burst_window, burst_
     #deact_exporter_svg = pg.exporters.SVGExporter(right_layout.layout().itemAtPosition(1, 0).widget().getPlotItem())
     #deact_exporter_svg.export(path + 'deactivation.svg')
 
-    deact_exporter_png = pg.exporters.ImageExporter(right_layout.layout().itemAtPosition(1, 0).widget().getPlotItem())
+    deact_exporter_png = pg.exporters.ImageExporter(right_groupbox.layout().itemAtPosition(1, 0).widget().getPlotItem())
     deact_exporter_png.export(path + 'deactivation.png')
 
     progress_callback.emit(95)
+
+    pixmap = QPixmap.grabWidget(left_groupbox)
+    pixmap.save(path + 'tsr_plot.png', 'png')
+    left_layout.layout().itemAtPosition(0, 0).widget().getPlotItem().showAxis('bottom')
 
 
 def save_tables_to_file(data, filepath, spike_method, spike_coeff, burst_window, burst_num_channels, progress_callback):
