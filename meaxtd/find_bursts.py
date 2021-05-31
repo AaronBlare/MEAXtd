@@ -398,7 +398,7 @@ def calculate_characteristics(data, progress_callback):
 
 
 def save_plots_to_file(filepath, spike_method, spike_coeff, burst_window, burst_num_channels, progress_callback,
-                       left_groupbox, right_groupbox, left_layout):
+                       left_groupbox, right_groupbox, left_layout, right_layout):
     path = filepath[:-3]
     if not os.path.isdir(path):
         os.mkdir(path)
@@ -441,9 +441,9 @@ def save_plots_to_file(filepath, spike_method, spike_coeff, burst_window, burst_
 
     progress_callback.emit(95)
 
-    pixmap = QPixmap.grabWidget(left_groupbox)
-    pixmap.save(path + 'tsr_plot.png', 'png')
-    left_layout.layout().itemAtPosition(0, 0).widget().getPlotItem().showAxis('bottom')
+    #pixmap = QPixmap.grabWidget(left_groupbox)
+    #pixmap.save(path + 'tsr_plot.png', 'png')
+    #left_layout.layout().itemAtPosition(0, 0).widget().getPlotItem().showAxis('bottom')
 
 
 def save_tables_to_file(data, filepath, spike_method, spike_coeff, burst_window, burst_num_channels, progress_callback):
