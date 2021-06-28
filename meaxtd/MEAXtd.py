@@ -9,10 +9,10 @@ from meaxtd.hdf5plot import HDF5PlotXY
 from meaxtd.find_bursts import find_spikes, find_bursts, calculate_characteristics, save_plots_to_file, \
     save_tables_to_file
 from meaxtd.stat_plots import raster_plot, tsr_plot, colormap_plot
-from PySide2.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal
+from PySide2.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal, QSize
 from PySide2.QtGui import QIcon, QFont, QScreen
 from PySide2.QtWidgets import (QApplication, QDialog, QFileDialog, QLayout, QFrame, QSizePolicy, QAction,
-                               QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget, QTabWidget,
+                               QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget, QTabWidget, QSpacerItem,
                                QGroupBox, QGridLayout, QPushButton, QComboBox, QRadioButton, QPlainTextEdit,
                                QProgressBar, QDoubleSpinBox, QSpinBox, QTableWidget, QTableWidgetItem, QHeaderView)
 
@@ -260,23 +260,96 @@ class MEAXtd(QMainWindow):
 
     def create_main_upper_layout(self):
         self.main_tab_upper_groupbox = QGroupBox(self.main_tab)
+        main_tab_upper_size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        main_tab_upper_size_policy.setHorizontalStretch(0)
+        main_tab_upper_size_policy.setVerticalStretch(2)
+        policy_flag = self.main_tab_upper_groupbox.sizePolicy().hasHeightForWidth()
+        main_tab_upper_size_policy.setHeightForWidth(policy_flag)
+        self.main_tab_upper_groupbox.setSizePolicy(main_tab_upper_size_policy)
+
         self.main_tab_upper_groupbox_layout = QHBoxLayout(self.main_tab_upper_groupbox)
 
         # Frame for Load and Process buttons
         self.frame = QFrame(self.main_tab_upper_groupbox)
+        button_frame_size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        button_frame_size_policy.setHorizontalStretch(1)
+        button_frame_size_policy.setVerticalStretch(0)
+        policy_flag = self.frame.sizePolicy().hasHeightForWidth()
+        button_frame_size_policy.setHeightForWidth(policy_flag)
+        self.frame.setSizePolicy(button_frame_size_policy)
         self.frame.setFrameShape(QFrame.StyledPanel)
         self.frame.setFrameShadow(QFrame.Raised)
         self.main_tab_button_layout = QVBoxLayout(self.frame)
         self.main_tab_button_layout.setContentsMargins(70, 50, 70, 50)
         self.load_button()
+
+        self.verticalSpacer = QSpacerItem(20, 60, QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.main_tab_button_layout.addItem(self.verticalSpacer)
+
         self.process_button()
         self.main_tab_upper_groupbox_layout.addWidget(self.frame)
 
-        # Spike Parameters Groupbox
-        self.spike_params_groupbox = QGroupBox(self.main_tab_upper_groupbox, title="Spike Parameters")
+        # Frame for parameters groupboxes
+        self.params_frame = QFrame(self.main_tab_upper_groupbox)
+        params_frame_size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        params_frame_size_policy.setHorizontalStretch(2)
+        params_frame_size_policy.setVerticalStretch(0)
+        policy_flag = self.params_frame.sizePolicy().hasHeightForWidth()
+        params_frame_size_policy.setHeightForWidth(policy_flag)
+        self.params_frame.setSizePolicy(params_frame_size_policy)
+        self.params_frame.setMinimumSize(QSize(300, 300))
+        self.params_frame.setFrameShape(QFrame.StyledPanel)
+        self.params_frame.setFrameShadow(QFrame.Raised)
+
+        self.params_frame_layout = QVBoxLayout(self.params_frame)
+
+        # Signal Editing Groupbox
+        self.signal_param_groupbox = QGroupBox(self.params_frame, title="Signal Editing")
 
         self.gbox_font = QFont()
         self.gbox_font.setPointSize(18)
+
+        self.signal_param_groupbox.setFont(self.gbox_font)
+        self.signal_param_grid_layout = QGridLayout(self.signal_param_groupbox)
+        self.signal_param_grid_layout.setContentsMargins(50, 20, 50, 20)
+
+        self.signal_start_label = QLabel(self.signal_param_groupbox, text="Signal start, min")
+        self.signal_start_label.setToolTip("Set signal start")
+        self.signal_start_label.setToolTipDuration(1000)
+        self.signal_param_grid_layout.addWidget(self.signal_start_label, 0, 0, 1, 1)
+
+        self.signal_start = QSpinBox(self.signal_param_groupbox)
+        self.size_policy1 = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Maximum)
+        self.size_policy1.setHorizontalStretch(0)
+        self.size_policy1.setVerticalStretch(0)
+        policy_flag = self.signal_start.sizePolicy().hasHeightForWidth()
+        self.size_policy1.setHeightForWidth(policy_flag)
+        self.signal_start.setSizePolicy(self.size_policy1)
+        self.signal_start.setMinimum(0)
+        self.signal_start.setMaximum(1000)
+        self.signal_start.setValue(0)
+        # self.signal_start.valueChanged.connect(self.burst_window_spinbox_change)
+        self.signal_param_grid_layout.addWidget(self.signal_start, 0, 1, 1, 1)
+
+        self.signal_end_label = QLabel(self.signal_param_groupbox, text="Signal end, min")
+        self.signal_end_label.setToolTip("Set signal end")
+        self.signal_end_label.setToolTipDuration(1000)
+        self.signal_param_grid_layout.addWidget(self.signal_end_label, 1, 0, 1, 1)
+
+        self.signal_end = QSpinBox(self.signal_param_groupbox)
+        policy_flag = self.signal_end.sizePolicy().hasHeightForWidth()
+        self.size_policy1.setHeightForWidth(policy_flag)
+        self.signal_end.setSizePolicy(self.size_policy1)
+        self.signal_end.setMinimum(0)
+        self.signal_end.setMaximum(1000)
+        self.signal_end.setValue(0)
+        # self.signal_end.valueChanged.connect(self.burst_channels_spinbox_change)
+        self.signal_param_grid_layout.addWidget(self.signal_end, 1, 1, 1, 1)
+
+        self.params_frame_layout.addWidget(self.signal_param_groupbox)
+
+        # Spike Parameters Groupbox
+        self.spike_params_groupbox = QGroupBox(self.main_tab_upper_groupbox, title="Spike Parameters")
 
         self.spike_params_groupbox.setFont(self.gbox_font)
         self.spike_grid_layout = QGridLayout(self.spike_params_groupbox)
@@ -288,9 +361,6 @@ class MEAXtd(QMainWindow):
         self.spike_grid_layout.addWidget(self.spike_method_label, 0, 0, 1, 1)
 
         self.spike_method_combobox = QComboBox(self.spike_params_groupbox)
-        self.size_policy1 = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Maximum)
-        self.size_policy1.setHorizontalStretch(0)
-        self.size_policy1.setVerticalStretch(0)
         policy_flag = self.spike_method_combobox.sizePolicy().hasHeightForWidth()
         self.size_policy1.setHeightForWidth(policy_flag)
         self.spike_method_combobox.setSizePolicy(self.size_policy1)
@@ -314,7 +384,7 @@ class MEAXtd(QMainWindow):
         self.spike_coeff.valueChanged.connect(self.spike_spinbox_change)
         self.spike_grid_layout.addWidget(self.spike_coeff, 1, 1, 1, 1)
 
-        self.main_tab_upper_groupbox_layout.addWidget(self.spike_params_groupbox)
+        self.params_frame_layout.addWidget(self.spike_params_groupbox)
 
         # Burst Parameters Groupbox
         self.burst_param_groupbox = QGroupBox(self.main_tab_upper_groupbox, title="Burst Parameters")
@@ -352,7 +422,21 @@ class MEAXtd(QMainWindow):
         self.burst_num_channels.valueChanged.connect(self.burst_channels_spinbox_change)
         self.burst_grid_layout.addWidget(self.burst_num_channels, 1, 1, 1, 1)
 
-        self.main_tab_upper_groupbox_layout.addWidget(self.burst_param_groupbox)
+        self.params_frame_layout.addWidget(self.burst_param_groupbox)
+
+        self.main_tab_upper_groupbox_layout.addWidget(self.params_frame)
+
+        # Channels Groupbox
+        self.channels_enabled_groupbox = QGroupBox(self.main_tab_upper_groupbox, title="Include/Exclude channels")
+        self.channels_enabled_groupbox.setFont(self.gbox_font)
+        channels_groupbox_size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        channels_groupbox_size_policy.setHorizontalStretch(2)
+        channels_groupbox_size_policy.setVerticalStretch(0)
+        policy_flag = self.channels_enabled_groupbox.sizePolicy().hasHeightForWidth()
+        channels_groupbox_size_policy.setHeightForWidth(policy_flag)
+        self.channels_enabled_groupbox.setSizePolicy(channels_groupbox_size_policy)
+
+        self.main_tab_upper_groupbox_layout.addWidget(self.channels_enabled_groupbox)
         self.main_tab_upper_layout.addWidget(self.main_tab_upper_groupbox)
 
     def load_button(self):
@@ -481,6 +565,13 @@ class MEAXtd(QMainWindow):
 
     def create_main_bottom_layout(self):
         self.main_tab_bottom_groupbox = QGroupBox(self.main_tab)
+        main_tab_bottom_size_policy = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Expanding)
+        main_tab_bottom_size_policy.setHorizontalStretch(0)
+        main_tab_bottom_size_policy.setVerticalStretch(1)
+        policy_flag = self.main_tab_bottom_groupbox.sizePolicy().hasHeightForWidth()
+        main_tab_bottom_size_policy.setHeightForWidth(policy_flag)
+        self.main_tab_bottom_groupbox.setSizePolicy(main_tab_bottom_size_policy)
+
         self.main_tab_bottom_groupbox.setFont(self.gbox_font)
         self.log_groupbox_layout = QVBoxLayout(self.main_tab_bottom_groupbox)
 
