@@ -1,6 +1,5 @@
 import sys
 import traceback
-import pkg_resources
 import pyqtgraph as pg
 import numpy as np
 import logging
@@ -10,7 +9,7 @@ from meaxtd.find_bursts import find_spikes, find_bursts, calculate_characteristi
     save_tables_to_file
 from meaxtd.stat_plots import raster_plot, tsr_plot, colormap_plot
 from PySide2.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal, QSize
-from PySide2.QtGui import QIcon, QFont, QScreen
+from PySide2.QtGui import QFont
 from PySide2.QtWidgets import (QApplication, QDialog, QFileDialog, QLayout, QFrame, QSizePolicy, QAction,
                                QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget, QTabWidget, QSpacerItem,
                                QGroupBox, QGridLayout, QPushButton, QComboBox, QRadioButton, QPlainTextEdit,
@@ -159,6 +158,7 @@ class MEAXtd(QMainWindow):
 
         self.threadpool = QThreadPool()
         self.param_change = False
+        self.excluded_channels = []
 
     def center(self):
         frame_gm = self.frameGeometry()
@@ -262,9 +262,13 @@ class MEAXtd(QMainWindow):
         if button.styleSheet() == u"background-color: rgb(85, 255, 127);":
             button.setStyleSheet(u"background-color: rgb(255, 85, 127);")
             self.logger.info(f"Channel {button.text()} excluded.")
+            self.excluded_channels.append(int(button.text()) - 1)
+            self.param_change = True
         else:
             button.setStyleSheet(u"background-color: rgb(85, 255, 127);")
             self.logger.info(f"Channel {button.text()} included.")
+            self.excluded_channels.remove(int(button.text()) - 1)
+            self.param_change = True
 
     def configure_signal_button(self, button):
         size_policy_flag = button.sizePolicy().hasHeightForWidth()
@@ -272,9 +276,6 @@ class MEAXtd(QMainWindow):
         button.setSizePolicy(self.signal_btn_size_policy)
         button.setMinimumSize(QSize(1, 1))
         button.setStyleSheet(u"background-color: rgb(85, 255, 127);")
-
-        self.signal_btn_font = QFont()
-        self.signal_btn_font.setPointSize(20)
         button.setFont(self.signal_btn_font)
 
         button.clicked.connect(lambda curr_button=button: self.include_exclude_channel(button))
@@ -462,6 +463,8 @@ class MEAXtd(QMainWindow):
         self.signal_btn_size_policy = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         self.signal_btn_size_policy.setHorizontalStretch(0)
         self.signal_btn_size_policy.setVerticalStretch(0)
+        self.signal_btn_font = QFont()
+        self.signal_btn_font.setPointSize(20)
 
         self.add_signal_buttons()
 
@@ -496,7 +499,7 @@ class MEAXtd(QMainWindow):
         spike_method = self.spike_method_combobox.currentText()
         spike_coeff = self.spike_coeff.value()
         self.logger.info("Spikes and bursts finding...")
-        find_spikes(self.data, spike_method, spike_coeff, progress_callback)
+        find_spikes(self.data, self.excluded_channels, spike_method, spike_coeff, progress_callback)
 
         if self.data.spikes:
             self.logger.info("Spikes found.")
@@ -508,7 +511,8 @@ class MEAXtd(QMainWindow):
 
         burst_window = self.burst_window_size.value()
         burst_num_channels = self.burst_num_channels.value()
-        find_bursts(self.data, spike_method, spike_coeff, burst_window, burst_num_channels, progress_callback)
+        find_bursts(self.data, self.excluded_channels, spike_method, spike_coeff, burst_window, burst_num_channels,
+                    progress_callback)
 
         if self.data.bursts:
             self.logger.info("Bursts found.")
@@ -520,7 +524,7 @@ class MEAXtd(QMainWindow):
             self.stat.plot_colormap(self.stat_right_groupbox_layout)
 
         self.logger.info("Characteristics calculating...")
-        calculate_characteristics(self.data, progress_callback)
+        calculate_characteristics(self.data, self.excluded_channels, progress_callback)
 
         if self.data.global_characteristics:
             self.logger.info("Characteristics calculated.")
@@ -533,10 +537,14 @@ class MEAXtd(QMainWindow):
             headers = list(self.data.channel_characteristics.keys())
             self.char_channel_table.setColumnCount(len(headers))
             self.char_channel_table.setHorizontalHeaderLabels(headers)
+            signal_shift = 0
             for signal_id in range(0, self.data.stream.shape[1]):
-                for n, key in enumerate(self.data.channel_characteristics):
-                    self.char_channel_table.setItem(signal_id, n, QTableWidgetItem(
-                        str(self.data.channel_characteristics[key][signal_id])))
+                if signal_id not in self.excluded_channels:
+                    for n, key in enumerate(self.data.channel_characteristics):
+                        self.char_channel_table.setItem(signal_id - signal_shift, n, QTableWidgetItem(
+                            str(self.data.channel_characteristics[key][signal_id])))
+                else:
+                    signal_shift += 1
             self.char_channel_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
 
         if self.data.burst_characteristics:
