@@ -217,9 +217,13 @@ class MEAXtd(QMainWindow):
         if self.data:
             self.logger.info(f"File loaded.")
             self.processqbtn.setEnabled(True)
-            self.plot.set_data(self.data)
-            self.stat.set_data(self.data)
+            self.plot.set_data(self.data, 0, int(np.ceil(self.data.time[-1] / 60)))
+            self.stat.set_data(self.data, 0, int(np.ceil(self.data.time[-1] / 60)))
             self.plot.plot_signals(self.plot_grid)
+            self.signal_start.setValue(0)
+            self.signal_end.setValue(int(np.ceil(self.data.time[-1] / 60)))
+            self.signal_start.valueChanged.connect(self.start_time_spinbox_change)
+            self.signal_end.valueChanged.connect(self.end_time_spinbox_change)
 
     def set_progress_value(self, value):
         if value > self.progressBar.value() or self.progressBar.value() > 99:
@@ -231,6 +235,8 @@ class MEAXtd(QMainWindow):
         self.filename = filename
 
         if accepted:
+            self.signal_start.valueChanged.disconnect()
+            self.signal_end.valueChanged.disconnect()
             if getattr(self, 'data', None) is not None:
                 self.data.clear_calculated()
                 self.clear_all()
@@ -256,6 +262,18 @@ class MEAXtd(QMainWindow):
 
     def burst_channels_spinbox_change(self):
         self.logger.info(f"Num channels for bursting: {self.burst_num_channels.value()}")
+        self.param_change = True
+
+    def start_time_spinbox_change(self):
+        self.logger.info(f"Start time: {self.signal_start.value()} min")
+        self.plot.set_data(self.data, self.signal_start.value(), self.signal_end.value())
+        self.stat.set_data(self.data, self.signal_start.value(), self.signal_end.value())
+        self.param_change = True
+
+    def end_time_spinbox_change(self):
+        self.logger.info(f"End time: {self.signal_end.value()} min")
+        self.plot.set_data(self.data, self.signal_start.value(), self.signal_end.value())
+        self.stat.set_data(self.data, self.signal_start.value(), self.signal_end.value())
         self.param_change = True
 
     def include_exclude_channel(self, button):
@@ -350,7 +368,7 @@ class MEAXtd(QMainWindow):
         self.signal_start.setMinimum(0)
         self.signal_start.setMaximum(1000)
         self.signal_start.setValue(0)
-        # self.signal_start.valueChanged.connect(self.burst_window_spinbox_change)
+        self.signal_start.valueChanged.connect(self.start_time_spinbox_change)
         self.signal_param_grid_layout.addWidget(self.signal_start, 0, 1, 1, 1)
 
         self.signal_end_label = QLabel(self.signal_param_groupbox, text="Signal end, min")
@@ -365,7 +383,7 @@ class MEAXtd(QMainWindow):
         self.signal_end.setMinimum(0)
         self.signal_end.setMaximum(1000)
         self.signal_end.setValue(0)
-        # self.signal_end.valueChanged.connect(self.burst_channels_spinbox_change)
+        self.signal_end.valueChanged.connect(self.end_time_spinbox_change)
         self.signal_param_grid_layout.addWidget(self.signal_end, 1, 1, 1, 1)
 
         self.params_frame_layout.addWidget(self.signal_param_groupbox)
@@ -498,8 +516,10 @@ class MEAXtd(QMainWindow):
     def process_all(self, progress_callback):
         spike_method = self.spike_method_combobox.currentText()
         spike_coeff = self.spike_coeff.value()
+        start = self.signal_start.value()
+        end = self.signal_end.value()
         self.logger.info("Spikes and bursts finding...")
-        find_spikes(self.data, self.excluded_channels, spike_method, spike_coeff, progress_callback)
+        find_spikes(self.data, self.excluded_channels, spike_method, spike_coeff, start, end, progress_callback)
 
         if self.data.spikes:
             self.logger.info("Spikes found.")
@@ -512,7 +532,7 @@ class MEAXtd(QMainWindow):
         burst_window = self.burst_window_size.value()
         burst_num_channels = self.burst_num_channels.value()
         find_bursts(self.data, self.excluded_channels, spike_method, spike_coeff, burst_window, burst_num_channels,
-                    progress_callback)
+                    start, end, progress_callback)
 
         if self.data.bursts:
             self.logger.info("Bursts found.")
@@ -524,7 +544,7 @@ class MEAXtd(QMainWindow):
             self.stat.plot_colormap(self.stat_right_groupbox_layout)
 
         self.logger.info("Characteristics calculating...")
-        calculate_characteristics(self.data, self.excluded_channels, progress_callback)
+        calculate_characteristics(self.data, start, end, progress_callback)
 
         if self.data.global_characteristics:
             self.logger.info("Characteristics calculated.")
@@ -581,16 +601,22 @@ class MEAXtd(QMainWindow):
         self.param_change = False
 
     def process(self):
-        if self.param_change:
-            self.data.clear_calculated()
-            self.clear_all()
-        if not self.data.spikes:
-            worker = Worker(self.process_all)
-            worker.signals.finished.connect(self.save_characteristics)
-            worker.signals.progress.connect(self.set_progress_value)
-            self.threadpool.start(worker)
+        if self.signal_start.value() >= self.signal_end.value():
+            self.logger.info("End time must be later than Start time.")
+        elif self.signal_end.value() > int(np.ceil(self.data.time[-1] / 60)):
+            self.signal_end.setValue(int(np.ceil(self.data.time[-1] / 60)))
+            self.logger.info(f"End time is set to {self.signal_end.value()}")
         else:
-            self.logger.info("Spikes and bursts already found.")
+            if self.param_change:
+                self.data.clear_calculated()
+                self.clear_all()
+            if not self.data.spikes:
+                worker = Worker(self.process_all)
+                worker.signals.finished.connect(self.save_characteristics)
+                worker.signals.progress.connect(self.set_progress_value)
+                self.threadpool.start(worker)
+            else:
+                self.logger.info("Spikes and bursts already found.")
 
     def create_param_groupbox(self):
         self.param_layout = QHBoxLayout(self.main_tab_param_widget)
@@ -1147,8 +1173,10 @@ class PlotDialog(QDialog):
         self.data = data
         self.init_ui(plot_grid)
 
-    def set_data(self, data):
+    def set_data(self, data, start, end):
         self.data = data
+        self.start = start
+        self.end = end
 
     def init_ui(self, plot_grid):
         self.fill_grid_layout(plot_grid)
@@ -1262,6 +1290,7 @@ class PlotDialog(QDialog):
                 plot_grid.layout().itemAtPosition(col_id, row_id).widget().addItem(bursts_borders)
 
     def change_range_next(self, plot_grid, data_type, signal_id):
+        start_index = np.where(self.data.time == self.start * 60)[0][0]
         curr_signal = signal_id - 1
         if data_type == 'spike':
             if getattr(self, 'spike_id', None) is None:
@@ -1270,7 +1299,7 @@ class PlotDialog(QDialog):
                 if self.spike_id < len(self.data.spikes[curr_signal]) - 1:
                     self.spike_id += 1
             if curr_signal in self.data.spikes and self.data.spikes[curr_signal].size > 0:
-                curr_spike = self.data.spikes[curr_signal][self.spike_id]
+                curr_spike = self.data.spikes[curr_signal][self.spike_id] + start_index
                 curr_spike_amplitude = self.data.spikes_amplitudes[curr_signal][self.spike_id]
                 left_border = max(0, self.data.time[curr_spike] - 0.5)
                 right_border = min(len(self.data.time), self.data.time[curr_spike] + 0.5)
@@ -1286,9 +1315,9 @@ class PlotDialog(QDialog):
                 if self.burstlet_id < len(self.data.burstlets[curr_signal]) - 1:
                     self.burstlet_id += 1
             if curr_signal in self.data.burstlets and len(self.data.burstlets[curr_signal]) > 0:
-                curr_burstlet = self.data.burstlets[curr_signal][self.burstlet_id]
-                curr_burstlet_start = self.data.burstlets_starts[curr_signal][self.burstlet_id]
-                curr_burstlet_end = self.data.burstlets_ends[curr_signal][self.burstlet_id]
+                curr_burstlet = self.data.burstlets[curr_signal][self.burstlet_id] + start_index
+                curr_burstlet_start = self.data.burstlets_starts[curr_signal][self.burstlet_id] + start_index
+                curr_burstlet_end = self.data.burstlets_ends[curr_signal][self.burstlet_id] + start_index
                 curr_burstlet_len = self.data.time[curr_burstlet_end] - self.data.time[curr_burstlet_start]
                 if curr_burstlet_len > 1:
                     left_border = self.data.time[curr_burstlet_start] - 0.1
@@ -1309,8 +1338,8 @@ class PlotDialog(QDialog):
                 if self.burst_id < len(self.data.bursts_starts[curr_signal]) - 1:
                     self.burst_id += 1
             if curr_signal in self.data.bursts_starts and len(self.data.bursts_starts[curr_signal]) > 0:
-                curr_burst_start = self.data.bursts_starts[curr_signal][self.burst_id]
-                curr_burst_end = self.data.bursts_ends[curr_signal][self.burst_id]
+                curr_burst_start = self.data.bursts_starts[curr_signal][self.burst_id] + start_index
+                curr_burst_end = self.data.bursts_ends[curr_signal][self.burst_id] + start_index
                 curr_burst_len = self.data.time[curr_burst_end] - self.data.time[curr_burst_start]
                 if curr_burst_len > 1:
                     left_border = self.data.time[curr_burst_start] - 0.1
@@ -1321,6 +1350,7 @@ class PlotDialog(QDialog):
                 plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
 
     def change_range_prev(self, plot_grid, data_type, signal_id):
+        start_index = np.where(self.data.time == self.start * 60)[0][0]
         curr_signal = signal_id - 1
         if data_type == 'spike':
             if getattr(self, 'spike_id', None) is None:
@@ -1329,7 +1359,7 @@ class PlotDialog(QDialog):
                 if self.spike_id > 0:
                     self.spike_id -= 1
             if curr_signal in self.data.spikes and self.data.spikes[curr_signal].size > 0:
-                curr_spike = self.data.spikes[curr_signal][self.spike_id]
+                curr_spike = self.data.spikes[curr_signal][self.spike_id] + start_index
                 curr_spike_amplitude = self.data.spikes_amplitudes[curr_signal][self.spike_id]
                 left_border = max(0, self.data.time[curr_spike] - 0.5)
                 right_border = min(len(self.data.time), self.data.time[curr_spike] + 0.5)
@@ -1345,9 +1375,9 @@ class PlotDialog(QDialog):
                 if self.burstlet_id > 0:
                     self.burstlet_id -= 1
             if curr_signal in self.data.burstlets and len(self.data.burstlets[curr_signal]) > 0:
-                curr_burstlet = self.data.burstlets[curr_signal][self.burstlet_id]
-                curr_burstlet_start = self.data.burstlets_starts[curr_signal][self.burstlet_id]
-                curr_burstlet_end = self.data.burstlets_ends[curr_signal][self.burstlet_id]
+                curr_burstlet = self.data.burstlets[curr_signal][self.burstlet_id] + start_index
+                curr_burstlet_start = self.data.burstlets_starts[curr_signal][self.burstlet_id] + start_index
+                curr_burstlet_end = self.data.burstlets_ends[curr_signal][self.burstlet_id] + start_index
                 curr_burstlet_len = curr_burstlet_end - curr_burstlet_start
                 if curr_burstlet_len > 1:
                     left_border = self.data.time[curr_burstlet_start] - 0.1
@@ -1368,8 +1398,8 @@ class PlotDialog(QDialog):
                 if self.burst_id > 0:
                     self.burst_id -= 1
             if curr_signal in self.data.bursts_starts and len(self.data.bursts_starts[curr_signal]) > 0:
-                curr_burst_start = self.data.bursts_starts[curr_signal][self.burst_id]
-                curr_burst_end = self.data.bursts_ends[curr_signal][self.burst_id]
+                curr_burst_start = self.data.bursts_starts[curr_signal][self.burst_id] + start_index
+                curr_burst_end = self.data.bursts_ends[curr_signal][self.burst_id] + start_index
                 curr_burst_len = self.data.time[curr_burst_end] - self.data.time[curr_burst_start]
                 if curr_burst_len > 1:
                     left_border = self.data.time[curr_burst_start] - 0.1
@@ -1387,8 +1417,10 @@ class StatDialog(QDialog):
         self.data = data
         self.init_ui(left_layout, right_layout)
 
-    def set_data(self, data):
+    def set_data(self, data, start, end):
         self.data = data
+        self.start = start
+        self.end = end
 
     def init_ui(self, left_layout, right_layout):
         self.configure_left(left_layout)
@@ -1441,7 +1473,7 @@ class StatDialog(QDialog):
         right_layout.addWidget(deact_plot, 1, 0)
 
     def plot_raster(self, left_layout):
-        rplot = raster_plot(self.data)
+        rplot = raster_plot(self.data, self.start)
         left_layout.layout().itemAtPosition(1, 0).widget().addItem(rplot)
         left_layout.layout().itemAtPosition(1, 0).widget().setLimits(xMin=0, xMax=self.data.time[-1])
         left_layout.layout().itemAtPosition(1, 0).widget().setXRange(0, self.data.time[-1])

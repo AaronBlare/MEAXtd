@@ -8,11 +8,18 @@ from intervaltree import IntervalTree
 from PySide2.QtGui import QPixmap, QImage, QPainter
 
 
-def find_spikes(data, excluded_channels, method, coefficient, progress_callback):
+def find_spikes(data, excluded_channels, method, coefficient, start, end, progress_callback):
     num_signals = data.stream.shape[1]
-    total_time_in_ms = int(np.ceil(data.time[-1] * 1000))
+
+    start_index = np.where(data.time == start * 60)[0][0]
+    if end < int(np.ceil(data.time[-1] / 60)):
+        end_index = np.where(data.time == end * 60)[0][0]
+    else:
+        end_index = np.where(data.time == data.time[-1])[0][0]
+
+    total_time_in_ms = int(np.ceil((data.time[end_index] - data.time[start_index]) * 1000))
     data.TSR = np.zeros(int(total_time_in_ms / 50), dtype=int)
-    data.TSR_times = np.arange(0, data.time[-1], 0.05)
+    data.TSR_times = np.arange(data.time[start_index], data.time[end_index], 0.05)
     for signal_id in range(0, num_signals):
         progress_callback.emit(round(signal_id * 30 / num_signals))
 
@@ -22,28 +29,29 @@ def find_spikes(data, excluded_channels, method, coefficient, progress_callback)
             data.spikes_ends[signal_id] = np.asarray([])
             data.spikes_amplitudes[signal_id] = np.asarray([])
 
-            data.spike_stream[signal_id] = np.empty(len(data.stream[:, signal_id]))
+            data.spike_stream[signal_id] = np.empty(len(data.stream[start_index:end_index, signal_id]))
             data.spike_stream[signal_id][:] = np.nan
 
         else:
             if method == 'Median':
-                noise_mad = np.median(np.absolute(data.stream[:, signal_id])) / 0.6745
-                crossings = detect_threshold_crossings(data.stream[:, signal_id], data.fs, coefficient * noise_mad,
-                                                       0.001)
+                noise_mad = np.median(np.absolute(data.stream[start_index:end_index, signal_id])) / 0.6745
+                crossings = detect_threshold_crossings(data.stream[start_index:end_index, signal_id], data.fs,
+                                                       coefficient * noise_mad, 0.001)
             elif method == 'RMS':
-                noise_rms = np.sqrt(np.mean(data.stream[:, signal_id] ** 2))
-                crossings = detect_threshold_crossings(data.stream[:, signal_id], data.fs, coefficient * noise_rms,
-                                                       0.001)
+                noise_rms = np.sqrt(np.mean(data.stream[start_index:end_index, signal_id] ** 2))
+                crossings = detect_threshold_crossings(data.stream[start_index:end_index, signal_id], data.fs,
+                                                       coefficient * noise_rms, 0.001)
             elif method == 'std':
-                noise_std = np.std(data.stream[:, signal_id])
-                crossings = detect_threshold_crossings(data.stream[:, signal_id], data.fs, coefficient * noise_std,
-                                                       0.001)
+                noise_std = np.std(data.stream[start_index:end_index, signal_id])
+                crossings = detect_threshold_crossings(data.stream[start_index:end_index, signal_id], data.fs,
+                                                       coefficient * noise_std, 0.001)
 
-            spikes = get_spike_peaks(data.stream[:, signal_id], data.fs, crossings, 0.001)
-            spikes_ends, spikes_maxima = get_spike_ends(data.stream[:, signal_id], data.fs, crossings, 0.001)
-            spikes_amplitudes = [
-                data.stream[:, signal_id][spikes_maxima[spike_id]] - data.stream[:, signal_id][spikes[spike_id]]
-                for spike_id in range(0, len(spikes))]
+            spikes = get_spike_peaks(data.stream[start_index:end_index, signal_id], data.fs, crossings, 0.001)
+            spikes_ends, spikes_maxima = get_spike_ends(data.stream[start_index:end_index, signal_id], data.fs,
+                                                        crossings, 0.001)
+            spikes_amplitudes = [data.stream[start_index:end_index, signal_id][spikes_maxima[spike_id]] -
+                                 data.stream[start_index:end_index, signal_id][spikes[spike_id]]
+                                 for spike_id in range(0, len(spikes))]
 
             data.spikes[signal_id] = np.asarray(spikes)
             data.spikes_starts[signal_id] = np.asarray(crossings)
@@ -56,7 +64,8 @@ def find_spikes(data, excluded_channels, method, coefficient, progress_callback)
                 TSR_index = int(np.ceil(spikes[peak_id] / 500))
                 data.TSR[TSR_index - 1] += 1
                 for curr_id in range(crossings[peak_id], spikes_ends[peak_id] + 1):
-                    data.spike_stream[signal_id][curr_id] = data.stream[curr_id, signal_id]
+                    curr_id_mod = start_index + curr_id
+                    data.spike_stream[signal_id][curr_id_mod] = data.stream[curr_id_mod, signal_id]
 
 
 def detect_threshold_crossings(signal, fs, threshold, dead_time):
@@ -105,9 +114,16 @@ def get_spike_ends(signal, fs, minima, search_range):
     return np.array(spikes_ends), np.array(spikes_maxima)
 
 
-def find_burstlets(data, excluded_channels, spike_method, spike_coeff, burst_window, progress_callback):
+def find_burstlets(data, excluded_channels, spike_method, spike_coeff, burst_window, start, end, progress_callback):
     if not data.spikes:
-        find_spikes(data, excluded_channels, spike_method, spike_coeff, progress_callback)
+        find_spikes(data, excluded_channels, spike_method, spike_coeff, start, end, progress_callback)
+
+    start_index = np.where(data.time == start * 60)[0][0]
+    if end < int(np.ceil(data.time[-1] / 60)):
+        end_index = np.where(data.time == end * 60)[0][0]
+    else:
+        end_index = np.where(data.time == data.time[-1])[0][0]
+
     num_signals = data.stream.shape[1]
     window = 10 * burst_window  # sampling frequency 0.1 ms
     for signal_id in range(0, num_signals):
@@ -119,7 +135,7 @@ def find_burstlets(data, excluded_channels, spike_method, spike_coeff, burst_win
             data.burstlets_ends[signal_id] = np.asarray([])
             data.burstlets_amplitudes[signal_id] = np.asarray([])
 
-            data.burstlet_stream[signal_id] = np.empty(len(data.stream[:, signal_id]))
+            data.burstlet_stream[signal_id] = np.empty(len(data.stream[start_index:end_index, signal_id]))
             data.burstlet_stream[signal_id][:] = np.nan
 
         else:
@@ -137,8 +153,9 @@ def find_burstlets(data, excluded_channels, spike_method, spike_coeff, burst_win
                         data.burstlets[signal_id].append(curr_burstlet)
                         curr_start_id = np.where(data.spikes[signal_id] == curr_burstlet[0])[0][0]
                         curr_end_id = np.where(data.spikes[signal_id] == curr_burstlet[-1])[0][0]
-                        burstlet_amplitude.append(max(data.stream[:, signal_id][curr_burstlet[0]:curr_burstlet[-1]]) -
-                                                  min(data.stream[:, signal_id][curr_burstlet[0]:curr_burstlet[-1]]))
+                        burstlet_amplitude.append(
+                            max(data.stream[start_index:end_index, signal_id][curr_burstlet[0]:curr_burstlet[-1]]) -
+                            min(data.stream[start_index:end_index, signal_id][curr_burstlet[0]:curr_burstlet[-1]]))
                         burstlet_start.append(data.spikes_starts[signal_id][curr_start_id])
                         burstlet_end.append(data.spikes_ends[signal_id][curr_end_id])
                     curr_burstlet = []
@@ -150,7 +167,8 @@ def find_burstlets(data, excluded_channels, spike_method, spike_coeff, burst_win
             data.burstlet_stream[signal_id][:] = np.nan
             for peak_id in range(0, len(data.burstlets[signal_id])):
                 for curr_id in range(burstlet_start[peak_id], burstlet_end[peak_id] + 1):
-                    data.burstlet_stream[signal_id][curr_id] = data.stream[curr_id, signal_id]
+                    curr_id_mod = curr_id + start_index
+                    data.burstlet_stream[signal_id][curr_id_mod] = data.stream[curr_id_mod, signal_id]
 
 
 def create_interval_tree(data):
@@ -164,11 +182,18 @@ def create_interval_tree(data):
     return tree
 
 
-def find_bursts(data, excluded_channels, spike_method, spike_coeff, burst_window, burst_num_channels,
+def find_bursts(data, excluded_channels, spike_method, spike_coeff, burst_window, burst_num_channels, start, end,
                 progress_callback):
     if not data.burstlets:
-        find_burstlets(data, excluded_channels, spike_method, spike_coeff, burst_window, progress_callback)
-    signal_len = len(data.stream[:, 0])
+        find_burstlets(data, excluded_channels, spike_method, spike_coeff, burst_window, start, end, progress_callback)
+
+    start_index = np.where(data.time == start * 60)[0][0]
+    if end < int(np.ceil(data.time[-1] / 60)):
+        end_index = np.where(data.time == end * 60)[0][0]
+    else:
+        end_index = np.where(data.time == data.time[-1])[0][0]
+
+    signal_len = len(data.stream[start_index:end_index, 0])
     num_signals = data.stream.shape[1]
     burst_detection_function = np.empty(signal_len, dtype=int)
     burst_detection_function[:] = 0
@@ -270,14 +295,21 @@ def find_bursts(data, excluded_channels, spike_method, spike_coeff, burst_window
             if burst_id in data.bursts_burstlets[signal_id]:
                 for curr_id in range(data.burstlets_starts[signal_id][burst_id],
                                      data.burstlets_ends[signal_id][burst_id]):
-                    data.burst_stream[signal_id][curr_id] = data.stream[curr_id, signal_id]
+                    curr_id_mod = curr_id + start_index
+                    data.burst_stream[signal_id][curr_id_mod] = data.stream[curr_id_mod, signal_id]
 
 
-def calculate_characteristics(data, excluded_channels, progress_callback):
+def calculate_characteristics(data, start, end, progress_callback):
     progress_callback.emit(80)
 
+    start_index = np.where(data.time == start * 60)[0][0]
+    if end < int(np.ceil(data.time[-1] / 60)):
+        end_index = np.where(data.time == end * 60)[0][0]
+    else:
+        end_index = np.where(data.time == data.time[-1])[0][0]
+
     num_signals = data.stream.shape[1]
-    num_seconds = data.time[-1]
+    num_seconds = data.time[end_index] - data.time[start_index]
     total_num_spikes = 0
     for signal_id in range(0, num_signals):
         total_num_spikes += len(data.spikes[signal_id])
@@ -289,8 +321,8 @@ def calculate_characteristics(data, excluded_channels, progress_callback):
     mean_spike_amplitude = np.mean(spike_amplitudes)
     std_spike_amplitude = np.std(spike_amplitudes)
     median_spike_amplitude = np.median(spike_amplitudes)
-    raster_duration_sec = data.time[-1]
-    raster_duration_ms = data.time[-1] * 1000
+    raster_duration_sec = data.time[end_index] - data.time[start_index]
+    raster_duration_ms = (data.time[end_index] - data.time[start_index]) * 1000
     total_num_bursts = len(data.bursts)
     num_bursts_per_min = total_num_bursts / (num_seconds / 60)
     time_bin = 50
@@ -352,8 +384,8 @@ def calculate_characteristics(data, excluded_channels, progress_callback):
             burstlet_id = interval.data['burstlet_id']
             curr_burstlet = data.burstlets[signal_id][burstlet_id]
             curr_num_spikes += len(curr_burstlet)
-        bursts_starts.append(data.time[activation_time])
-        bursts_ends.append(data.time[deactivation_time])
+        bursts_starts.append(data.time[start_index] + data.time[activation_time])
+        bursts_ends.append(data.time[start_index] + data.time[deactivation_time])
         signal_set = list(set(signal_list))
         num_channels.append(len(signal_set))
         signal_set.sort()
@@ -398,22 +430,28 @@ def calculate_characteristics(data, excluded_channels, progress_callback):
     num_minutes = num_seconds / 60
     starts = []
     finishes = []
-    for time_id in range(0, int(num_minutes + 1)):
+    for time_id in range(start, int(start + num_minutes + 1)):
         starts.append(str(datetime.timedelta(seconds=time_id * 60)))
         finishes.append(str(datetime.timedelta(seconds=(time_id + 1) * 60)))
-    finishes[-1] = str(datetime.timedelta(seconds=num_seconds))
+    finishes[-1] = str(datetime.timedelta(seconds=data.time[end_index]))
 
     num_bursts_each_minute = [0] * int(num_minutes + 1)
     for burst_start in bursts_starts:
-        minute_id = int(burst_start / 60)
+        minute_id = int(burst_start / 60) - start
         num_bursts_each_minute[minute_id] += 1
 
     num_spikes_each_minute = [0] * int(num_minutes + 1)
     for signal_id in range(0, num_signals):
         for spike in data.spikes[signal_id]:
-            spike_time = data.time[spike]
-            minute_id = int(spike_time / 60)
+            spike_time = data.time[start_index] + data.time[spike]
+            minute_id = int(spike_time / 60) - start
             num_spikes_each_minute[minute_id] += 1
+
+    if starts[-1] == finishes[-1]:
+        del starts[-1]
+        del finishes[-1]
+        del num_bursts_each_minute[-1]
+        del num_spikes_each_minute[-1]
 
     data.time_characteristics['Start'] = starts
     data.time_characteristics['End'] = finishes
