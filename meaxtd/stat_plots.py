@@ -2,7 +2,8 @@ import pyqtgraph as pg
 import numpy as np
 
 
-def raster_plot(data):
+def raster_plot(data, start):
+    start_index = np.where(data.time == start * 60)[0][0]
     num_signals = data.stream.shape[1]
     num_spikes = 0
     for signal_id in range(0, num_signals):
@@ -13,7 +14,7 @@ def raster_plot(data):
     for signal_id in range(0, num_signals):
         curr_spikes = data.spikes[signal_id]
         for curr_spike in curr_spikes:
-            nodes[node_id, 0] = data.time[curr_spike]
+            nodes[node_id, 0] = data.time[start_index] + data.time[curr_spike]
             nodes[node_id, 1] = signal_id + 1
             node_id += 1
     spots = [{'pos': nodes[i, :], 'data': 1} for i in range(num_spikes)] + [{'pos': [0, 0], 'data': 1}]
