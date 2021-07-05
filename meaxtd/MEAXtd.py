@@ -5,8 +5,8 @@ import numpy as np
 import logging
 from meaxtd.read_h5 import read_h5_file
 from meaxtd.hdf5plot import HDF5PlotXY
-from meaxtd.find_bursts import find_spikes, find_bursts, calculate_characteristics, save_plots_to_file, \
-    save_tables_to_file
+from meaxtd.find_bursts import find_spikes, find_bursts, calculate_characteristics
+from meaxtd.save_result import save_tables_to_file, save_plots_to_file, save_params_to_file
 from meaxtd.stat_plots import raster_plot, tsr_plot, colormap_plot
 from PySide2.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal, QSize
 from PySide2.QtGui import QFont
@@ -534,6 +534,18 @@ class MEAXtd(QMainWindow):
         find_bursts(self.data, self.excluded_channels, spike_method, spike_coeff, burst_window, burst_num_channels,
                     start, end, progress_callback)
 
+        excluded_channels = self.excluded_channels
+        excluded_channels.sort()
+        excluded_channels = [channel + 1 for channel in excluded_channels]
+
+        params_dict = {'Signal start, min': start,
+                       'Signal end, min': end,
+                       'Spike method': spike_method,
+                       'Spike coefficient': spike_coeff,
+                       'Burst window, ms': burst_window,
+                       'Burst num channels': burst_num_channels,
+                       'Excluded channels': excluded_channels}
+
         if self.data.bursts:
             self.logger.info("Bursts found.")
             self.highlight_none_rb.setCheckable(True)
@@ -589,12 +601,12 @@ class MEAXtd(QMainWindow):
                         str(self.data.time_characteristics[key][minute_id])))
             self.char_time_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
-        save_plots_to_file(self.filename, spike_method, spike_coeff, burst_window, burst_num_channels,
-                           progress_callback, self.stat_left_groupbox, self.stat_right_groupbox,
+        self.path_to_save = save_tables_to_file(self.data, self.filename, progress_callback)
+
+        save_plots_to_file(self.path_to_save, progress_callback, self.stat_left_groupbox, self.stat_right_groupbox,
                            self.stat_left_groupbox_layout, self.stat_right_groupbox_layout)
 
-        self.path_to_save = save_tables_to_file(self.data, self.filename, spike_method, spike_coeff, burst_window,
-                                                burst_num_channels, progress_callback)
+        save_params_to_file(self.path_to_save, progress_callback, params_dict)
 
     def save_characteristics(self):
         self.logger.info(f"Characteristics saved to {self.path_to_save}")
