@@ -162,8 +162,8 @@ class MEAXtd(QMainWindow):
 
     def center(self):
         frame_gm = self.frameGeometry()
-        center_point = QScreen.availableGeometry(QApplication.primaryScreen()).center()
-        frame_gm.moveCenter(center_point)
+        center_point = QScreen.availableGeometry(QApplication.primaryScreen()).center()  # pyside6 and pyside2 diff
+        frame_gm.moveCenter(center_point)  # pyside6 and pyside2 diff
         self.move(frame_gm.topLeft())
 
     def clear_all(self):
@@ -291,7 +291,7 @@ class MEAXtd(QMainWindow):
         size_policy_flag = button.sizePolicy().hasHeightForWidth()
         self.signal_btn_size_policy.setHeightForWidth(size_policy_flag)
         button.setSizePolicy(self.signal_btn_size_policy)
-        button.setMinimumSize(QSize(1, 1))
+        button.setMinimumSize(1, 1)  # pyside6 and pyside2 diff
         button.setStyleSheet(u"background-color: rgb(85, 255, 127);")
         button.setFont(self.signal_btn_font)
 
@@ -336,7 +336,7 @@ class MEAXtd(QMainWindow):
         policy_flag = self.params_frame.sizePolicy().hasHeightForWidth()
         params_frame_size_policy.setHeightForWidth(policy_flag)
         self.params_frame.setSizePolicy(params_frame_size_policy)
-        self.params_frame.setMinimumSize(QSize(300, 300))
+        self.params_frame.setMinimumSize(300, 300)  # pyside6 and pyside2 diff
         self.params_frame.setFrameShape(QFrame.StyledPanel)
         self.params_frame.setFrameShadow(QFrame.Raised)
 
