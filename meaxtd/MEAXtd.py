@@ -124,15 +124,21 @@ class MEAXtd(QMainWindow):
         central_flag = self.central_widget.sizePolicy().hasHeightForWidth()
         central_size_policy.setHeightForWidth(central_flag)
         self.central_widget.setSizePolicy(central_size_policy)
-        self.main_layout = QHBoxLayout(self.central_widget)
+        self.main_layout = QVBoxLayout(self.central_widget)
         self.main_layout.setSizeConstraint(QLayout.SetNoConstraint)
 
         self.tabs = QTabWidget(self.central_widget)
+        tab_size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        tab_size_policy.setHorizontalStretch(0)
+        tab_size_policy.setVerticalStretch(5)
+        tab_size_policy_flag = self.tabs.sizePolicy().hasHeightForWidth()
+        tab_size_policy.setHeightForWidth(tab_size_policy_flag)
+        self.tabs.setSizePolicy(tab_size_policy)
+        self.tabs.setFocusPolicy(Qt.ClickFocus)
 
         self.main_tab = QWidget()
         self.main_tab_upper_layout = QVBoxLayout(self.main_tab)
         self.create_main_upper_layout()
-        self.create_main_bottom_layout()
 
         self.plot_tab = QWidget()
         self.plot_tab_layout = QVBoxLayout(self.plot_tab)
@@ -153,6 +159,9 @@ class MEAXtd(QMainWindow):
         self.tabs.addTab(self.char_tab, "Characteristics")
 
         self.main_layout.addWidget(self.tabs)
+
+        self.create_logging_layout()
+
         self.setCentralWidget(self.central_widget)
         self.center()
 
@@ -302,7 +311,7 @@ class MEAXtd(QMainWindow):
         self.main_tab_upper_groupbox = QGroupBox(self.main_tab)
         main_tab_upper_size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         main_tab_upper_size_policy.setHorizontalStretch(0)
-        main_tab_upper_size_policy.setVerticalStretch(2)
+        main_tab_upper_size_policy.setVerticalStretch(0)
         policy_flag = self.main_tab_upper_groupbox.sizePolicy().hasHeightForWidth()
         main_tab_upper_size_policy.setHeightForWidth(policy_flag)
         self.main_tab_upper_groupbox.setSizePolicy(main_tab_upper_size_policy)
@@ -825,43 +834,6 @@ class MEAXtd(QMainWindow):
         self.configure_signal_button(self.signal_button_60)
         self.channels_enabled_layout.addWidget(self.signal_button_60, 5, 9, 1, 1)
 
-    def create_main_bottom_layout(self):
-        self.main_tab_bottom_groupbox = QGroupBox(self.main_tab)
-        main_tab_bottom_size_policy = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Expanding)
-        main_tab_bottom_size_policy.setHorizontalStretch(0)
-        main_tab_bottom_size_policy.setVerticalStretch(1)
-        policy_flag = self.main_tab_bottom_groupbox.sizePolicy().hasHeightForWidth()
-        main_tab_bottom_size_policy.setHeightForWidth(policy_flag)
-        self.main_tab_bottom_groupbox.setSizePolicy(main_tab_bottom_size_policy)
-
-        self.main_tab_bottom_groupbox.setFont(self.gbox_font)
-        self.log_groupbox_layout = QVBoxLayout(self.main_tab_bottom_groupbox)
-
-        self.logger = logging.getLogger('log')
-        self.log_handler = ThreadLogger()
-        self.log_handler.setFormatter(
-            logging.Formatter('%(asctime)s - %(message)s', "%Y-%m-%d %H:%M:%S"))
-        self.logger.addHandler(self.log_handler)
-        self.logger.setLevel(logging.INFO)
-
-        self.log_window = QPlainTextEdit(self.main_tab_bottom_groupbox)
-        self.log_window.setReadOnly(True)
-        size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
-        size_policy.setHorizontalStretch(0)
-        size_policy.setVerticalStretch(0)
-        size_policy_flag = self.log_window.sizePolicy().hasHeightForWidth()
-        size_policy.setHeightForWidth(size_policy_flag)
-        self.log_window.setSizePolicy(size_policy)
-        self.log_groupbox_layout.addWidget(self.log_window)
-
-        self.log_handler.log.signal.connect(self.write_log)
-
-        self.progressBar = QProgressBar(self.main_tab_bottom_groupbox)
-        self.progressBar.setValue(100)
-        self.log_groupbox_layout.addWidget(self.progressBar)
-
-        self.main_tab_upper_layout.addWidget(self.main_tab_bottom_groupbox)
-
     @Slot(str)
     def write_log(self, log_text):
         self.log_window.appendPlainText(log_text)
@@ -1141,6 +1113,42 @@ class MEAXtd(QMainWindow):
         self.char_time_label = QLabel(text="Time characteristics")
         self.char_time_label.setFont(self.gbox_font)
         self.char_tab_layout.addWidget(self.char_time_label, 0, 4, 1, 1)
+
+    def create_logging_layout(self):
+        self.main_logging_groupbox = QGroupBox(self.central_widget)
+        main_logging_size_policy = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Expanding)
+        main_logging_size_policy.setHorizontalStretch(0)
+        main_logging_size_policy.setVerticalStretch(1)
+        policy_flag = self.main_logging_groupbox.sizePolicy().hasHeightForWidth()
+        main_logging_size_policy.setHeightForWidth(policy_flag)
+        self.main_logging_groupbox.setSizePolicy(main_logging_size_policy)
+
+        self.main_logging_groupbox.setFont(self.gbox_font)
+        self.log_groupbox_layout = QVBoxLayout(self.main_logging_groupbox)
+
+        self.logger = logging.getLogger('log')
+        self.log_handler = ThreadLogger()
+        self.log_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s', "%Y-%m-%d %H:%M:%S"))
+        self.logger.addHandler(self.log_handler)
+        self.logger.setLevel(logging.INFO)
+
+        self.log_window = QPlainTextEdit(self.main_logging_groupbox)
+        self.log_window.setReadOnly(True)
+        size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        size_policy.setHorizontalStretch(0)
+        size_policy.setVerticalStretch(0)
+        size_policy_flag = self.log_window.sizePolicy().hasHeightForWidth()
+        size_policy.setHeightForWidth(size_policy_flag)
+        self.log_window.setSizePolicy(size_policy)
+        self.log_groupbox_layout.addWidget(self.log_window)
+
+        self.log_handler.log.signal.connect(self.write_log)
+
+        self.progressBar = QProgressBar(self.main_logging_groupbox)
+        self.progressBar.setValue(100)
+        self.log_groupbox_layout.addWidget(self.progressBar)
+
+        self.main_layout.addWidget(self.main_logging_groupbox)
 
 
 class AboutDialog(QDialog):
