@@ -113,7 +113,7 @@ class MEAXtd(QMainWindow):
         self.menu_bar = self.menuBar()
         self.about_dialog = AboutDialog()
         self.status_bar = self.statusBar()
-        self.status_bar.showMessage('Ready')
+        # self.status_bar.showMessage('Ready')
         self.file_menu()
         self.help_menu()
 
@@ -130,7 +130,7 @@ class MEAXtd(QMainWindow):
         self.tabs = QTabWidget(self.central_widget)
         tab_size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         tab_size_policy.setHorizontalStretch(0)
-        tab_size_policy.setVerticalStretch(5)
+        tab_size_policy.setVerticalStretch(10)
         tab_size_policy_flag = self.tabs.sizePolicy().hasHeightForWidth()
         tab_size_policy.setHeightForWidth(tab_size_policy_flag)
         self.tabs.setSizePolicy(tab_size_policy)
@@ -1123,8 +1123,15 @@ class MEAXtd(QMainWindow):
         main_logging_size_policy.setHeightForWidth(policy_flag)
         self.main_logging_groupbox.setSizePolicy(main_logging_size_policy)
 
-        self.main_logging_groupbox.setFont(self.gbox_font)
-        self.log_groupbox_layout = QVBoxLayout(self.main_logging_groupbox)
+        self.logger_font = QFont()
+        self.logger_font.setPointSize(14)
+
+        self.main_logging_groupbox.setFont(self.logger_font)
+        self.log_groupbox_layout = QHBoxLayout(self.main_logging_groupbox)
+
+        self.progressBar = QProgressBar(self.main_logging_groupbox)
+        self.progressBar.setValue(100)
+        self.log_groupbox_layout.addWidget(self.progressBar)
 
         self.logger = logging.getLogger('log')
         self.log_handler = ThreadLogger()
@@ -1143,10 +1150,6 @@ class MEAXtd(QMainWindow):
         self.log_groupbox_layout.addWidget(self.log_window)
 
         self.log_handler.log.signal.connect(self.write_log)
-
-        self.progressBar = QProgressBar(self.main_logging_groupbox)
-        self.progressBar.setValue(100)
-        self.log_groupbox_layout.addWidget(self.progressBar)
 
         self.main_layout.addWidget(self.main_logging_groupbox)
 
