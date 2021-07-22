@@ -4,6 +4,7 @@ import pyqtgraph as pg
 import pyqtgraph.exporters
 import datetime
 import json
+from pathlib import Path
 
 
 def save_tables_to_file(data, filepath, progress_callback):
@@ -23,7 +24,7 @@ def save_tables_to_file(data, filepath, progress_callback):
     suffix = f"{str(curr_date)}_{curr_hour}-{curr_minute}-{curr_second}"
     path = f"{path}/{suffix}/"
     if not os.path.isdir(path):
-        os.mkdir(path)
+        Path(path).mkdir(parents=True)
 
     global_df = pd.DataFrame(data=data.global_characteristics, index=[0])
     global_df.to_excel(path + 'global.xlsx', index=False)

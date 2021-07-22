@@ -6,6 +6,7 @@ import logging
 from meaxtd.read_h5 import read_h5_file
 from meaxtd.hdf5plot import HDF5PlotXY
 from meaxtd.find_bursts import find_spikes, find_bursts, calculate_characteristics
+from meaxtd.construct_graph import find_delayed_spikes
 from meaxtd.save_result import save_tables_to_file, save_plots_to_file, save_params_to_file
 from meaxtd.stat_plots import raster_plot, tsr_plot, colormap_plot
 from PySide2.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal, QSize
@@ -13,7 +14,8 @@ from PySide2.QtGui import QFont
 from PySide2.QtWidgets import (QApplication, QDialog, QFileDialog, QLayout, QFrame, QSizePolicy, QAction,
                                QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget, QTabWidget, QSpacerItem,
                                QGroupBox, QGridLayout, QPushButton, QComboBox, QRadioButton, QPlainTextEdit,
-                               QProgressBar, QDoubleSpinBox, QSpinBox, QTableWidget, QTableWidgetItem, QHeaderView)
+                               QProgressBar, QDoubleSpinBox, QSpinBox, QTableWidget, QTableWidgetItem, QHeaderView,
+                               QStyleFactory)
 
 pg.setConfigOption('background', 'w')
 pg.setConfigOption('foreground', 'k')
@@ -326,8 +328,6 @@ class MEAXtd(QMainWindow):
         policy_flag = self.frame.sizePolicy().hasHeightForWidth()
         button_frame_size_policy.setHeightForWidth(policy_flag)
         self.frame.setSizePolicy(button_frame_size_policy)
-        self.frame.setFrameShape(QFrame.StyledPanel)
-        self.frame.setFrameShadow(QFrame.Raised)
         self.main_tab_button_layout = QVBoxLayout(self.frame)
         self.main_tab_button_layout.setContentsMargins(70, 50, 70, 50)
         self.load_button()
@@ -347,8 +347,6 @@ class MEAXtd(QMainWindow):
         params_frame_size_policy.setHeightForWidth(policy_flag)
         self.params_frame.setSizePolicy(params_frame_size_policy)
         self.params_frame.setMinimumSize(QSize(300, 300))
-        self.params_frame.setFrameShape(QFrame.StyledPanel)
-        self.params_frame.setFrameShadow(QFrame.Raised)
 
         self.params_frame_layout = QVBoxLayout(self.params_frame)
 
@@ -542,6 +540,8 @@ class MEAXtd(QMainWindow):
         burst_num_channels = self.burst_num_channels.value()
         find_bursts(self.data, self.excluded_channels, spike_method, spike_coeff, burst_window, burst_num_channels,
                     start, end, progress_callback)
+
+        find_delayed_spikes(self.data)
 
         excluded_channels = self.excluded_channels
         excluded_channels.sort()
@@ -1543,6 +1543,7 @@ class StatDialog(QDialog):
 
 def main(args=sys.argv):
     application = QApplication(args)
+    application.setStyle(QStyleFactory.create('Fusion'))
     screen = application.primaryScreen()
     rect = screen.availableGeometry()
     window = MEAXtd(rect)
