@@ -61,7 +61,7 @@ def find_spikes(data, excluded_channels, method, coefficient, start, end, progre
             data.spike_stream[signal_id] = np.empty(len(data.stream[:, signal_id]))
             data.spike_stream[signal_id][:] = np.nan
             for peak_id in range(0, len(spikes)):
-                TSR_index = int(np.ceil(spikes[peak_id] / 500))
+                TSR_index = int(np.ceil(spikes[peak_id] * data.time[1] * 1000 / 50))
                 data.TSR[TSR_index - 1] += 1
                 for curr_id in range(crossings[peak_id], spikes_ends[peak_id] + 1):
                     curr_id_mod = start_index + curr_id
