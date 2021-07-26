@@ -184,8 +184,7 @@ def create_interval_tree(data):
 
 def find_bursts(data, excluded_channels, spike_method, spike_coeff, burst_window, burst_num_channels, start, end,
                 progress_callback):
-    if not data.burstlets:
-        find_burstlets(data, excluded_channels, spike_method, spike_coeff, burst_window, start, end, progress_callback)
+    method = 'TSR'
 
     start_index = np.where(data.time == start * 60)[0][0]
     if end < int(np.ceil(data.time[-1] / 60)):
@@ -195,108 +194,124 @@ def find_bursts(data, excluded_channels, spike_method, spike_coeff, burst_window
 
     signal_len = len(data.stream[start_index:end_index, 0])
     num_signals = data.stream.shape[1]
-    burst_detection_function = np.empty(signal_len, dtype=int)
-    burst_detection_function[:] = 0
-    for signal_id in range(0, num_signals):
-        data.bursts_starts[signal_id] = []
-        data.bursts_ends[signal_id] = []
-        data.bursts_burstlets[signal_id] = []
-        for burstlet_id in range(0, len(data.burstlets[signal_id])):
-            curr_burstlet_start = data.burstlets_starts[signal_id][burstlet_id]
-            curr_burstlet_end = data.burstlets_ends[signal_id][burstlet_id]
-            burst_detection_function[curr_burstlet_start:curr_burstlet_end] += 1
-    threshold_crossings = np.diff(burst_detection_function > burst_num_channels, prepend=False)
-    threshold_crossings_ids = np.argwhere(threshold_crossings)[:, 0]
-    interval_tree = create_interval_tree(data)
-    for interval_id in range(0, len(threshold_crossings_ids) // 2):
-        progress_callback.emit(60 + int(interval_id * 10 / (len(threshold_crossings_ids) // 2)))
-        interval_start = threshold_crossings_ids[interval_id * 2]
-        interval_end = threshold_crossings_ids[interval_id * 2 + 1]
-        curr_intervals = interval_tree.overlap(interval_start, interval_end)
-        if len(curr_intervals) > burst_num_channels:
-            data.bursts.append(curr_intervals)
-            curr_signals = []
-            curr_burstlets = []
-            for interval in curr_intervals:
-                curr_data = interval.data
-                curr_signals.append(curr_data['signal_id'])
-                curr_burstlets.append(curr_data['burstlet_id'])
-            curr_start = len(data.time)
-            curr_finish = 0
-            for i in range(0, len(curr_signals)):
-                curr_signal = curr_signals[i]
-                curr_burstlet = curr_burstlets[i]
-                if data.burstlets_starts[curr_signal][curr_burstlet] < curr_start:
-                    curr_start = data.burstlets_starts[curr_signal][curr_burstlet]
-                if data.burstlets_ends[curr_signal][curr_burstlet] > curr_finish:
-                    curr_finish = data.burstlets_ends[curr_signal][curr_burstlet]
-            for i in range(0, len(curr_signals)):
-                curr_signal = curr_signals[i]
-                curr_burstlet = curr_burstlets[i]
-                if len(data.bursts_starts[curr_signal]) == 0 or curr_start > data.bursts_starts[curr_signal][-1]:
-                    data.bursts_starts[curr_signal].append(curr_start)
-                    data.bursts_ends[curr_signal].append(curr_finish)
-                    data.bursts_burstlets[curr_signal].append(curr_burstlet)
 
-    burst_activation_vector = np.empty(shape=(len(data.bursts), num_signals))
-    burst_activation_vector[:] = np.nan
-    burst_deactivation_vector = np.empty(shape=(len(data.bursts), num_signals))
-    burst_deactivation_vector[:] = np.nan
-    for burst_id in range(0, len(data.bursts)):
-        curr_burst = data.bursts[burst_id]
-        activation_time = len(data.time)
-        deactivation_time = 0
-        for interval in curr_burst:
-            if interval.begin < activation_time:
-                activation_time = interval.begin
-            if interval.end > deactivation_time:
-                deactivation_time = interval.end
-        for interval in curr_burst:
-            signal_id = interval.data['signal_id']
-            curr_activation_time = data.time[interval.begin] - data.time[activation_time]
-            burst_activation_vector[burst_id, signal_id] = curr_activation_time
-            curr_deactivation_time = data.time[deactivation_time] - data.time[interval.end]
-            burst_deactivation_vector[burst_id, signal_id] = curr_deactivation_time
-    data.burst_activation = np.zeros(num_signals)
-    data.burst_deactivation = np.zeros(num_signals)
-    for signal_id in range(0, num_signals):
-        if signal_id not in excluded_channels:
-            num_activations = 0
-            num_deactivations = 0
-            curr_activations = 0
-            curr_deactivations = 0
-            for burst_id in range(0, len(data.bursts)):
-                if not np.isnan(burst_activation_vector[burst_id, signal_id]):
-                    num_activations += 1
-                    curr_activations += burst_activation_vector[burst_id, signal_id]
-                if not np.isnan(burst_deactivation_vector[burst_id, signal_id]):
-                    num_deactivations += 1
-                    curr_deactivations += burst_deactivation_vector[burst_id, signal_id]
-            if num_activations > 0:
-                data.burst_activation[signal_id] = curr_activations / num_activations
-            if num_deactivations > 0:
-                data.burst_deactivation[signal_id] = curr_deactivations / num_deactivations
+    if method == 'burstlet':
+        if not data.burstlets:
+            find_burstlets(data, excluded_channels, spike_method, spike_coeff, burst_window, start, end,
+                           progress_callback)
 
-    for signal_id in range(0, num_signals):
-        progress_callback.emit(70 + round(signal_id * 10 / num_signals))
-        data.burst_stream[signal_id] = np.empty(len(data.stream[:, signal_id]))
-        data.burst_stream[signal_id][:] = np.nan
-        data.burst_borders[signal_id] = np.empty(len(data.stream[:, signal_id]))
-        data.burst_borders[signal_id][:] = np.nan
-        for burst_id in range(0, len(data.bursts_starts[signal_id])):
-            curr_start = data.bursts_starts[signal_id][burst_id]
-            curr_end = data.bursts_ends[signal_id][burst_id]
-            amplitude = max(data.burstlets_amplitudes[signal_id])
-            data.burst_borders[signal_id][curr_start] = amplitude
-            data.burst_borders[signal_id][curr_start + 1] = - amplitude
-            data.burst_borders[signal_id][curr_end] = amplitude
-            data.burst_borders[signal_id][curr_end + 1] = - amplitude
-        for burst_id in range(0, len(data.burstlets[signal_id])):
-            if burst_id in data.bursts_burstlets[signal_id]:
-                for curr_id in range(data.burstlets_starts[signal_id][burst_id],
-                                     data.burstlets_ends[signal_id][burst_id]):
-                    curr_id_mod = curr_id + start_index
-                    data.burst_stream[signal_id][curr_id_mod] = data.stream[curr_id_mod, signal_id]
+        burst_detection_function = np.empty(signal_len, dtype=int)
+        burst_detection_function[:] = 0
+        for signal_id in range(0, num_signals):
+            data.bursts_starts[signal_id] = []
+            data.bursts_ends[signal_id] = []
+            data.bursts_burstlets[signal_id] = []
+            for burstlet_id in range(0, len(data.burstlets[signal_id])):
+                curr_burstlet_start = data.burstlets_starts[signal_id][burstlet_id]
+                curr_burstlet_end = data.burstlets_ends[signal_id][burstlet_id]
+                burst_detection_function[curr_burstlet_start:curr_burstlet_end] += 1
+        threshold_crossings = np.diff(burst_detection_function > burst_num_channels, prepend=False)
+        threshold_crossings_ids = np.argwhere(threshold_crossings)[:, 0]
+        interval_tree = create_interval_tree(data)
+        for interval_id in range(0, len(threshold_crossings_ids) // 2):
+            progress_callback.emit(60 + int(interval_id * 10 / (len(threshold_crossings_ids) // 2)))
+            interval_start = threshold_crossings_ids[interval_id * 2]
+            interval_end = threshold_crossings_ids[interval_id * 2 + 1]
+            curr_intervals = interval_tree.overlap(interval_start, interval_end)
+            if len(curr_intervals) > burst_num_channels:
+                data.bursts.append(curr_intervals)
+                curr_signals = []
+                curr_burstlets = []
+                for interval in curr_intervals:
+                    curr_data = interval.data
+                    curr_signals.append(curr_data['signal_id'])
+                    curr_burstlets.append(curr_data['burstlet_id'])
+                curr_start = len(data.time)
+                curr_finish = 0
+                for i in range(0, len(curr_signals)):
+                    curr_signal = curr_signals[i]
+                    curr_burstlet = curr_burstlets[i]
+                    if data.burstlets_starts[curr_signal][curr_burstlet] < curr_start:
+                        curr_start = data.burstlets_starts[curr_signal][curr_burstlet]
+                    if data.burstlets_ends[curr_signal][curr_burstlet] > curr_finish:
+                        curr_finish = data.burstlets_ends[curr_signal][curr_burstlet]
+                for i in range(0, len(curr_signals)):
+                    curr_signal = curr_signals[i]
+                    curr_burstlet = curr_burstlets[i]
+                    if len(data.bursts_starts[curr_signal]) == 0 or curr_start > data.bursts_starts[curr_signal][-1]:
+                        data.bursts_starts[curr_signal].append(curr_start)
+                        data.bursts_ends[curr_signal].append(curr_finish)
+                        data.bursts_burstlets[curr_signal].append(curr_burstlet)
+
+        burst_activation_vector = np.empty(shape=(len(data.bursts), num_signals))
+        burst_activation_vector[:] = np.nan
+        burst_deactivation_vector = np.empty(shape=(len(data.bursts), num_signals))
+        burst_deactivation_vector[:] = np.nan
+        for burst_id in range(0, len(data.bursts)):
+            curr_burst = data.bursts[burst_id]
+            activation_time = len(data.time)
+            deactivation_time = 0
+            for interval in curr_burst:
+                if interval.begin < activation_time:
+                    activation_time = interval.begin
+                if interval.end > deactivation_time:
+                    deactivation_time = interval.end
+            for interval in curr_burst:
+                signal_id = interval.data['signal_id']
+                curr_activation_time = data.time[interval.begin] - data.time[activation_time]
+                burst_activation_vector[burst_id, signal_id] = curr_activation_time
+                curr_deactivation_time = data.time[deactivation_time] - data.time[interval.end]
+                burst_deactivation_vector[burst_id, signal_id] = curr_deactivation_time
+        data.burst_activation = np.zeros(num_signals)
+        data.burst_deactivation = np.zeros(num_signals)
+        for signal_id in range(0, num_signals):
+            if signal_id not in excluded_channels:
+                num_activations = 0
+                num_deactivations = 0
+                curr_activations = 0
+                curr_deactivations = 0
+                for burst_id in range(0, len(data.bursts)):
+                    if not np.isnan(burst_activation_vector[burst_id, signal_id]):
+                        num_activations += 1
+                        curr_activations += burst_activation_vector[burst_id, signal_id]
+                    if not np.isnan(burst_deactivation_vector[burst_id, signal_id]):
+                        num_deactivations += 1
+                        curr_deactivations += burst_deactivation_vector[burst_id, signal_id]
+                if num_activations > 0:
+                    data.burst_activation[signal_id] = curr_activations / num_activations
+                if num_deactivations > 0:
+                    data.burst_deactivation[signal_id] = curr_deactivations / num_deactivations
+
+        for signal_id in range(0, num_signals):
+            progress_callback.emit(70 + round(signal_id * 10 / num_signals))
+            data.burst_stream[signal_id] = np.empty(len(data.stream[:, signal_id]))
+            data.burst_stream[signal_id][:] = np.nan
+            data.burst_borders[signal_id] = np.empty(len(data.stream[:, signal_id]))
+            data.burst_borders[signal_id][:] = np.nan
+            for burst_id in range(0, len(data.bursts_starts[signal_id])):
+                curr_start = data.bursts_starts[signal_id][burst_id]
+                curr_end = data.bursts_ends[signal_id][burst_id]
+                amplitude = max(data.burstlets_amplitudes[signal_id])
+                data.burst_borders[signal_id][curr_start] = amplitude
+                data.burst_borders[signal_id][curr_start + 1] = - amplitude
+                data.burst_borders[signal_id][curr_end] = amplitude
+                data.burst_borders[signal_id][curr_end + 1] = - amplitude
+            for burst_id in range(0, len(data.burstlets[signal_id])):
+                if burst_id in data.bursts_burstlets[signal_id]:
+                    for curr_id in range(data.burstlets_starts[signal_id][burst_id],
+                                         data.burstlets_ends[signal_id][burst_id]):
+                        curr_id_mod = curr_id + start_index
+                        data.burst_stream[signal_id][curr_id_mod] = data.stream[curr_id_mod, signal_id]
+
+    if method == 'TSR':
+        tsr_function = data.TSR
+        tsr_std = np.std(tsr_function)
+        tsr_threshold = 0.1 * tsr_std
+        threshold_crossings = np.diff(tsr_function > tsr_threshold, prepend=False)
+        threshold_crossings_ids = np.argwhere(threshold_crossings)[:, 0]
+        for interval_id in range(0, len(threshold_crossings_ids) // 2):
+            interval_start = threshold_crossings_ids[interval_id * 2]
+            interval_end = threshold_crossings_ids[interval_id * 2 + 1]
 
 
 def calculate_characteristics(data, start, end, progress_callback):
