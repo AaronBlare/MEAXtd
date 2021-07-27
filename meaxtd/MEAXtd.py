@@ -541,7 +541,7 @@ class MEAXtd(QMainWindow):
         find_bursts(self.data, self.excluded_channels, spike_method, spike_coeff, burst_window, burst_num_channels,
                     start, end, progress_callback)
 
-        find_delayed_spikes(self.data)
+        # find_delayed_spikes(self.data)
 
         excluded_channels = self.excluded_channels
         excluded_channels.sort()
