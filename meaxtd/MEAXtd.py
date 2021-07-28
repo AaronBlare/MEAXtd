@@ -268,12 +268,14 @@ class MEAXtd(QMainWindow):
         if self.burst_method_combobox.currentText() == 'Burstlet':
             self.burst_param_label.setText("Num channels")
             self.burst_param_label.setToolTip("Minimal number of channels for burst")
+            self.burst_param.setDecimals(0)
             self.burst_param.setMinimum(0)
             self.burst_param.setMaximum(60)
             self.burst_param.setValue(5)
         if self.burst_method_combobox.currentText() == 'TSR':
             self.burst_param_label.setText("Threshold coefficient")
             self.burst_param_label.setToolTip("Coefficient for threshold: mean(TSR) + coeff * std(TSR)")
+            self.burst_param.setDecimals(2)
             self.burst_param.setMinimum(-100.0)
             self.burst_param.setMaximum(100.0)
             self.burst_param.setValue(1.0)
@@ -502,10 +504,12 @@ class MEAXtd(QMainWindow):
         self.size_policy1.setHeightForWidth(policy_flag)
         self.burst_param.setSizePolicy(self.size_policy1)
         if self.burst_method_combobox.currentText() == 'Burstlet':
+            self.burst_param.setDecimals(0)
             self.burst_param.setMinimum(0.0)
             self.burst_param.setMaximum(60.0)
             self.burst_param.setValue(5.0)
         if self.burst_method_combobox.currentText() == 'TSR':
+            self.burst_param.setDecimals(2)
             self.burst_param.setMinimum(-100.0)
             self.burst_param.setMaximum(100.0)
             self.burst_param.setValue(1.0)
