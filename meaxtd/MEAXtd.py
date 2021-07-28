@@ -263,6 +263,22 @@ class MEAXtd(QMainWindow):
         self.logger.info(f"Spike method: {self.spike_method_combobox.currentText()}")
         self.param_change = True
 
+    def burst_combobox_change(self):
+        self.logger.info(f"Burst method: {self.burst_method_combobox.currentText()}")
+        if self.burst_method_combobox.currentText() == 'Burstlet':
+            self.burst_param_label.setText("Num channels")
+            self.burst_param_label.setToolTip("Minimal number of channels for burst")
+            self.burst_param.setMinimum(0)
+            self.burst_param.setMaximum(60)
+            self.burst_param.setValue(5)
+        if self.burst_method_combobox.currentText() == 'TSR':
+            self.burst_param_label.setText("Threshold coefficient")
+            self.burst_param_label.setToolTip("Coefficient for threshold: mean(TSR) + coeff * std(TSR)")
+            self.burst_param.setMinimum(-100.0)
+            self.burst_param.setMaximum(100.0)
+            self.burst_param.setValue(1.0)
+        self.param_change = True
+
     def spike_spinbox_change(self):
         self.logger.info(f"Spike coefficient: {self.spike_coeff.value()}")
         self.param_change = True
@@ -271,8 +287,11 @@ class MEAXtd(QMainWindow):
         self.logger.info(f"Burst window: {self.burst_window_size.value()} ms")
         self.param_change = True
 
-    def burst_channels_spinbox_change(self):
-        self.logger.info(f"Num channels for bursting: {self.burst_num_channels.value()}")
+    def burst_parameter_spinbox_change(self):
+        if self.burst_method_combobox.currentText() == 'Burstlet':
+            self.logger.info(f"Num channels for bursting: {int(self.burst_param.value())}")
+        if self.burst_method_combobox.currentText() == 'TSR':
+            self.logger.info(f"TSR threshold coefficient: {self.burst_param.value()}")
         self.param_change = True
 
     def start_time_spinbox_change(self):
@@ -439,10 +458,24 @@ class MEAXtd(QMainWindow):
         self.burst_grid_layout = QGridLayout(self.burst_param_groupbox)
         self.burst_grid_layout.setContentsMargins(50, 20, 50, 20)
 
+        self.burst_method_label = QLabel(self.burst_param_groupbox, text="Method")
+        self.burst_method_label.setToolTip("Method for burst searching")
+        self.burst_method_label.setToolTipDuration(1000)
+        self.burst_grid_layout.addWidget(self.burst_method_label, 0, 0, 1, 1)
+
+        self.burst_method_combobox = QComboBox(self.burst_param_groupbox)
+        policy_flag = self.burst_method_combobox.sizePolicy().hasHeightForWidth()
+        self.size_policy1.setHeightForWidth(policy_flag)
+        self.burst_method_combobox.setSizePolicy(self.size_policy1)
+        burst_methods = ['TSR', 'Burstlet']
+        self.burst_method_combobox.addItems(burst_methods)
+        self.burst_method_combobox.currentIndexChanged.connect(self.burst_combobox_change)
+        self.burst_grid_layout.addWidget(self.burst_method_combobox, 0, 1, 1, 1)
+
         self.burst_window_label = QLabel(self.burst_param_groupbox, text="Window size, ms")
         self.burst_window_label.setToolTip("Window size for burst")
         self.burst_window_label.setToolTipDuration(1000)
-        self.burst_grid_layout.addWidget(self.burst_window_label, 0, 0, 1, 1)
+        self.burst_grid_layout.addWidget(self.burst_window_label, 1, 0, 1, 1)
 
         self.burst_window_size = QSpinBox(self.burst_param_groupbox)
         policy_flag = self.burst_window_size.sizePolicy().hasHeightForWidth()
@@ -452,22 +485,32 @@ class MEAXtd(QMainWindow):
         self.burst_window_size.setMaximum(1000)
         self.burst_window_size.setValue(100)
         self.burst_window_size.valueChanged.connect(self.burst_window_spinbox_change)
-        self.burst_grid_layout.addWidget(self.burst_window_size, 0, 1, 1, 1)
+        self.burst_grid_layout.addWidget(self.burst_window_size, 1, 1, 1, 1)
 
-        self.burst_num_channels_label = QLabel(self.burst_param_groupbox, text="Num channels")
-        self.burst_num_channels_label.setToolTip("Minimal number of channels for burst")
-        self.burst_num_channels_label.setToolTipDuration(1000)
-        self.burst_grid_layout.addWidget(self.burst_num_channels_label, 1, 0, 1, 1)
+        self.burst_param_label = QLabel(self.burst_param_groupbox)
+        if self.burst_method_combobox.currentText() == 'Burstlet':
+            self.burst_param_label.setText("Num channels")
+            self.burst_param_label.setToolTip("Minimal number of channels for burst")
+        if self.burst_method_combobox.currentText() == 'TSR':
+            self.burst_param_label.setText("Threshold coefficient")
+            self.burst_param_label.setToolTip("Coefficient for threshold: mean(TSR) + coeff * std(TSR)")
+        self.burst_param_label.setToolTipDuration(1000)
+        self.burst_grid_layout.addWidget(self.burst_param_label, 2, 0, 1, 1)
 
-        self.burst_num_channels = QSpinBox(self.burst_param_groupbox)
-        policy_flag = self.burst_num_channels.sizePolicy().hasHeightForWidth()
+        self.burst_param = QDoubleSpinBox(self.burst_param_groupbox)
+        policy_flag = self.burst_param.sizePolicy().hasHeightForWidth()
         self.size_policy1.setHeightForWidth(policy_flag)
-        self.burst_num_channels.setSizePolicy(self.size_policy1)
-        self.burst_num_channels.setMinimum(0)
-        self.burst_num_channels.setMaximum(60)
-        self.burst_num_channels.setValue(5)
-        self.burst_num_channels.valueChanged.connect(self.burst_channels_spinbox_change)
-        self.burst_grid_layout.addWidget(self.burst_num_channels, 1, 1, 1, 1)
+        self.burst_param.setSizePolicy(self.size_policy1)
+        if self.burst_method_combobox.currentText() == 'Burstlet':
+            self.burst_param.setMinimum(0.0)
+            self.burst_param.setMaximum(60.0)
+            self.burst_param.setValue(5.0)
+        if self.burst_method_combobox.currentText() == 'TSR':
+            self.burst_param.setMinimum(-100.0)
+            self.burst_param.setMaximum(100.0)
+            self.burst_param.setValue(1.0)
+        self.burst_param.valueChanged.connect(self.burst_parameter_spinbox_change)
+        self.burst_grid_layout.addWidget(self.burst_param, 2, 1, 1, 1)
 
         self.params_frame_layout.addWidget(self.burst_param_groupbox)
 
@@ -536,10 +579,17 @@ class MEAXtd(QMainWindow):
             self.stat.plot_raster(self.stat_left_groupbox_layout)
             self.stat.plot_tsr(self.stat_left_groupbox_layout)
 
+        burst_method = self.burst_method_combobox.currentText()
         burst_window = self.burst_window_size.value()
-        burst_num_channels = self.burst_num_channels.value()
-        find_bursts(self.data, self.excluded_channels, spike_method, spike_coeff, burst_window, burst_num_channels,
-                    start, end, progress_callback)
+        if burst_method == 'Burstlet':
+            burst_param = int(self.burst_param.value())
+        if burst_method == 'TSR':
+            burst_param = self.burst_param.value()
+        find_bursts(self.data, self.excluded_channels, spike_method, spike_coeff, burst_method, burst_window,
+                    burst_param, start, end, progress_callback)
+
+        self.logger.info(f"TSR threshold: {np.mean(self.data.TSR) + burst_param * np.std(self.data.TSR)}")
+        self.logger.info(f"TSR mean: {np.mean(self.data.TSR)}; TSR std: {np.std(self.data.TSR)}")
 
         # find_delayed_spikes(self.data)
 
@@ -551,8 +601,9 @@ class MEAXtd(QMainWindow):
                        'Signal end, min': end,
                        'Spike method': spike_method,
                        'Spike coefficient': spike_coeff,
+                       'Burst method': burst_method,
                        'Burst window, ms': burst_window,
-                       'Burst num channels': burst_num_channels,
+                       'Burst param': burst_param,
                        'Excluded channels': excluded_channels}
 
         if self.data.bursts:

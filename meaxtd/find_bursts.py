@@ -187,9 +187,8 @@ def create_interval_tree(data):
     return tree
 
 
-def find_bursts(data, excluded_channels, spike_method, spike_coeff, burst_window, burst_num_channels, start, end,
-                progress_callback):
-    method = 'TSR'
+def find_bursts(data, excluded_channels, spike_method, spike_coeff, burst_method, burst_window, burst_param,
+                start, end, progress_callback):
 
     start_index = np.where(data.time == start * 60)[0][0]
     if end < int(np.ceil(data.time[-1] / 60)):
@@ -200,7 +199,7 @@ def find_bursts(data, excluded_channels, spike_method, spike_coeff, burst_window
     signal_len = len(data.stream[start_index:end_index, 0])
     num_signals = data.stream.shape[1]
 
-    if method == 'burstlet':
+    if burst_method == 'Burstlet':
         if not data.burstlets:
             find_burstlets(data, excluded_channels, spike_method, spike_coeff, burst_window, start, end,
                            progress_callback)
@@ -223,7 +222,7 @@ def find_bursts(data, excluded_channels, spike_method, spike_coeff, burst_window
             interval_start = threshold_crossings_ids[interval_id * 2]
             interval_end = threshold_crossings_ids[interval_id * 2 + 1]
             curr_intervals = interval_tree.overlap(interval_start, interval_end)
-            if len(curr_intervals) > burst_num_channels:
+            if len(curr_intervals) > burst_param:
                 data.bursts.append(curr_intervals)
                 curr_signals = []
                 curr_burstlets = []
@@ -268,11 +267,11 @@ def find_bursts(data, excluded_channels, spike_method, spike_coeff, burst_window
                 curr_deactivation_time = data.time[deactivation_time] - data.time[interval.end]
                 burst_deactivation_vector[burst_id, signal_id] = curr_deactivation_time
 
-    if method == 'TSR':
+    if burst_method == 'TSR':
         tsr_function = data.TSR
         tsr_mean = np.mean(tsr_function)
         tsr_std = np.std(tsr_function)
-        tsr_threshold = tsr_mean + 1.0 * tsr_std
+        tsr_threshold = tsr_mean + burst_param * tsr_std
         threshold_crossings = np.diff(tsr_function > tsr_threshold, prepend=False)
         threshold_crossings_ids = np.argwhere(threshold_crossings)[:, 0]
         for signal_id in range(0, num_signals):
