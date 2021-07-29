@@ -595,7 +595,7 @@ class MEAXtd(QMainWindow):
         self.logger.info(f"TSR threshold: {np.mean(self.data.TSR) + burst_param * np.std(self.data.TSR)}")
         self.logger.info(f"TSR mean: {np.mean(self.data.TSR)}; TSR std: {np.std(self.data.TSR)}")
 
-        # find_delayed_spikes(self.data)
+        find_delayed_spikes(self.data, burst_method)
 
         excluded_channels = self.excluded_channels
         excluded_channels.sort()
