@@ -98,9 +98,14 @@ def save_params_to_file(path, progress_callback, params_dict):
             f.write(f'{key}\t{str(params_dict[key])}\n')
     f.close()
 
-    progress_callback.emit(99)
-
     with open(path + 'params.json', 'w') as f:
         json.dump(params_dict, f)
+
+    progress_callback.emit(99)
+
+
+def save_graph_to_file(path, progress_callback, graph):
+
+    graph.draw(path + 'graph.png')
 
     progress_callback.emit(100)

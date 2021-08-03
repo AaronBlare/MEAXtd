@@ -7,7 +7,7 @@ from meaxtd.read_h5 import read_h5_file
 from meaxtd.hdf5plot import HDF5PlotXY
 from meaxtd.find_bursts import find_spikes, find_bursts, calculate_characteristics
 from meaxtd.construct_graph import construct_delayed_spikes_graph
-from meaxtd.save_result import save_tables_to_file, save_plots_to_file, save_params_to_file
+from meaxtd.save_result import save_tables_to_file, save_plots_to_file, save_params_to_file, save_graph_to_file
 from meaxtd.stat_plots import raster_plot, tsr_plot, colormap_plot
 from PySide2.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal, QSize
 from PySide2.QtGui import QFont
@@ -671,6 +671,8 @@ class MEAXtd(QMainWindow):
                            self.stat_left_groupbox_layout, self.stat_right_groupbox_layout)
 
         save_params_to_file(self.path_to_save, progress_callback, params_dict)
+
+        save_graph_to_file(self.path_to_save, progress_callback, self.data.graph)
 
     def save_characteristics(self):
         self.logger.info(f"Characteristics saved to {self.path_to_save}")

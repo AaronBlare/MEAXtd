@@ -159,18 +159,21 @@ def construct_delayed_spikes_graph(data, burst_method):
     c_ij_top = c_ij_sorted_df[c_ij_sorted_df['C_ij_max'] > percentile_value]
 
     graph = pgv.AGraph(directed=True, strict=True)
-    nodes = set(c_ij_top['Channel 1']).union(c_ij_top['Channel 2'])
-    nodes = dict.fromkeys([f"Cell {node}" for node in nodes], {'total': 0, 'post': 0})
+    curr_nodes = set(c_ij_top['Channel 1']).union(c_ij_top['Channel 2'])
+    nodes = {}
+    for node in curr_nodes:
+        nodes[f"Cell {node + 1}"] = {'total': 0, 'post': 0}
     for pre_node in list(c_ij_top['Channel 1']):
-        nodes[f"Cell {pre_node}"]['total'] += 1
+        nodes[f"Cell {pre_node + 1}"]['total'] += 1
     for post_node in list(c_ij_top['Channel 2']):
-        nodes[f"Cell {post_node}"]['total'] += 1
-        nodes[f"Cell {post_node}"]['post'] += 1
+        nodes[f"Cell {post_node + 1}"]['total'] += 1
+        nodes[f"Cell {post_node + 1}"]['post'] += 1
     for node in nodes:
         graph.add_node(node, label=f"{node} [{nodes[node]['total']}]")
     for edge_id in range(0, len(c_ij_top['Channel 1'])):
-        cell_1 = f"Cell {list(c_ij_top['Channel 1'])[edge_id]}"
-        cell_2 = f"Cell {list(c_ij_top['Channel 2'])[edge_id]}"
+        cell_1 = f"Cell {list(c_ij_top['Channel 1'])[edge_id] + 1}"
+        cell_2 = f"Cell {list(c_ij_top['Channel 2'])[edge_id] + 1}"
         graph.add_edge(cell_1, cell_2, weight=nodes[cell_2]['post'], label=f"{list(c_ij_top['tau'])[edge_id]}ms")
     graph.layout("dot")
+    data.graph = graph
     #graph.draw("foo.png")
