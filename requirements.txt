@@ -14,3 +14,4 @@ McsPyDataTools>=0.4.1
 PySide2>=5.15.2
 intervaltree>=3.1.0
 openpyxl>=3.0.7
+pygraphviz>=1.7

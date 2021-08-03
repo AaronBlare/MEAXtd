@@ -6,7 +6,7 @@ import logging
 from meaxtd.read_h5 import read_h5_file
 from meaxtd.hdf5plot import HDF5PlotXY
 from meaxtd.find_bursts import find_spikes, find_bursts, calculate_characteristics
-from meaxtd.construct_graph import find_delayed_spikes
+from meaxtd.construct_graph import construct_delayed_spikes_graph
 from meaxtd.save_result import save_tables_to_file, save_plots_to_file, save_params_to_file
 from meaxtd.stat_plots import raster_plot, tsr_plot, colormap_plot
 from PySide2.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal, QSize
@@ -595,7 +595,7 @@ class MEAXtd(QMainWindow):
         self.logger.info(f"TSR threshold: {np.mean(self.data.TSR) + burst_param * np.std(self.data.TSR)}")
         self.logger.info(f"TSR mean: {np.mean(self.data.TSR)}; TSR std: {np.std(self.data.TSR)}")
 
-        find_delayed_spikes(self.data, burst_method)
+        construct_delayed_spikes_graph(self.data, burst_method)
 
         excluded_channels = self.excluded_channels
         excluded_channels.sort()
