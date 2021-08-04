@@ -176,4 +176,3 @@ def construct_delayed_spikes_graph(data, burst_method):
         graph.add_edge(cell_1, cell_2, weight=nodes[cell_2]['post'], label=f"{list(c_ij_top['tau'])[edge_id]}ms")
     graph.layout("dot")
     data.graph = graph
-    #graph.draw("foo.png")

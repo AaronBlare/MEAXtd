@@ -11,7 +11,7 @@ from meaxtd.save_result import save_tables_to_file, save_plots_to_file, save_par
 from meaxtd.stat_plots import raster_plot, tsr_plot, colormap_plot
 from PySide2.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal, QSize
 from PySide2.QtGui import QFont
-from PySide2.QtWidgets import (QApplication, QDialog, QFileDialog, QLayout, QFrame, QSizePolicy, QAction,
+from PySide2.QtWidgets import (QApplication, QDialog, QFileDialog, QLayout, QFrame, QSizePolicy, QAction, QFormLayout,
                                QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget, QTabWidget, QSpacerItem,
                                QGroupBox, QGridLayout, QPushButton, QComboBox, QRadioButton, QPlainTextEdit,
                                QProgressBar, QDoubleSpinBox, QSpinBox, QTableWidget, QTableWidgetItem, QHeaderView,
@@ -155,10 +155,15 @@ class MEAXtd(QMainWindow):
         self.char_tab_layout = QGridLayout(self.char_tab)
         self.create_char_layout()
 
+        self.graph_tab = QWidget()
+        self.graph_tab_layout = QHBoxLayout(self.graph_tab)
+        self.create_graph_layout()
+
         self.tabs.addTab(self.main_tab, "Main")
         self.tabs.addTab(self.plot_tab, "Signal")
         self.tabs.addTab(self.stat_tab, "Plots")
         self.tabs.addTab(self.char_tab, "Characteristics")
+        self.tabs.addTab(self.graph_tab, "Graphs")
 
         self.main_layout.addWidget(self.tabs)
 
@@ -1172,6 +1177,97 @@ class MEAXtd(QMainWindow):
         self.char_time_label = QLabel(text="Time characteristics")
         self.char_time_label.setFont(self.gbox_font)
         self.char_tab_layout.addWidget(self.char_time_label, 0, 4, 1, 1)
+
+    def create_graph_layout(self):
+        self.graph_info_panel = QWidget(self.graph_tab)
+        size_policy_graph_left = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        size_policy_graph_left.setHorizontalStretch(0)
+        size_policy_graph_left.setVerticalStretch(0)
+        size_policy_graph_left_flag = self.graph_info_panel.sizePolicy().hasHeightForWidth()
+        size_policy_graph_left.setHeightForWidth(size_policy_graph_left_flag)
+        self.graph_info_panel.setSizePolicy(size_policy_graph_left)
+        self.graph_info_panel_layout = QGridLayout(self.graph_info_panel)
+
+        self.graph_table = QTableWidget(self.graph_info_panel)
+        self.graph_info_panel_layout.addWidget(self.graph_table, 0, 0, 1, 1)
+
+        self.graph_params_panel = QWidget(self.graph_info_panel)
+        self.graph_params_panel_layout = QVBoxLayout(self.graph_params_panel)
+
+        self.graph_params_groupbox = QGroupBox(self.graph_params_panel, title="Graph Parameters")
+        size_policy_graph_params = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        size_policy_graph_params.setHorizontalStretch(0)
+        size_policy_graph_params.setVerticalStretch(2)
+        size_policy_graph_params_flag = self.graph_params_groupbox.sizePolicy().hasHeightForWidth()
+        size_policy_graph_params.setHeightForWidth(size_policy_graph_params_flag)
+        self.graph_params_groupbox.setSizePolicy(size_policy_graph_params)
+        self.graph_params_groupbox.setFont(self.gbox_font)
+        self.graph_params_groupbox_layout = QGridLayout(self.graph_params_groupbox)
+
+        self.graph_delta_param_label = QLabel(self.graph_params_groupbox, text="Delta, ms")
+        self.graph_params_groupbox_layout.addWidget(self.graph_delta_param_label, 0, 0, 1, 1)
+        self.graph_delta_param_label.setToolTip("Size of delayed spike detection step")
+
+        self.graph_params_delta_spinbox = QDoubleSpinBox(self.graph_params_groupbox)
+        self.graph_params_groupbox_layout.addWidget(self.graph_params_delta_spinbox, 0, 1, 1, 1)
+
+        self.graph_tau_param_label = QLabel(self.graph_params_groupbox, text="Num frames")
+        self.graph_params_groupbox_layout.addWidget(self.graph_tau_param_label, 1, 0, 1, 1)
+        self.graph_tau_param_label.setToolTip("Maximum correlation time-shift in frames")
+
+        self.graph_params_tau_spinbox = QSpinBox(self.graph_params_groupbox)
+        self.graph_params_groupbox_layout.addWidget(self.graph_params_tau_spinbox, 1, 1, 1, 1)
+
+        self.graph_cutoff_param_label = QLabel(self.graph_params_groupbox, text="Cutoff top, %")
+        self.graph_params_groupbox_layout.addWidget(self.graph_cutoff_param_label, 2, 0, 1, 1)
+        self.graph_cutoff_param_label.setToolTip("Choose top % of C_ij")
+
+        self.graph_params_cutoff_spinbox = QSpinBox(self.graph_params_groupbox)
+        self.graph_params_groupbox_layout.addWidget(self.graph_params_cutoff_spinbox, 2, 1, 1, 1)
+
+        self.graph_params_panel_layout.addWidget(self.graph_params_groupbox)
+
+        self.graph_navigation_groupbox = QGroupBox(self.graph_params_panel, title="Navigation")
+        size_policy_graph_navigation = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        size_policy_graph_navigation.setHorizontalStretch(0)
+        size_policy_graph_navigation.setVerticalStretch(1)
+        size_policy_graph_navigation_flag = self.graph_navigation_groupbox.sizePolicy().hasHeightForWidth()
+        size_policy_graph_navigation.setHeightForWidth(size_policy_graph_navigation_flag)
+        self.graph_navigation_groupbox.setSizePolicy(size_policy_graph_navigation)
+        self.graph_navigation_groupbox.setFont(self.gbox_font)
+        self.graph_navigation_groupbox_layout = QHBoxLayout(self.graph_navigation_groupbox)
+        self.graph_navigation_groupbox_layout.setContentsMargins(50, 50, 50, 50)
+
+        self.burst_number_combobox = QComboBox(self.graph_navigation_groupbox)
+        self.graph_navigation_groupbox_layout.addWidget(self.burst_number_combobox)
+
+        self.horizontalSpacer = QSpacerItem(40, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+        self.graph_navigation_groupbox_layout.addItem(self.horizontalSpacer)
+
+        self.build_graph_btn = QPushButton(self.graph_navigation_groupbox, text="Build Graph")
+        size_policy_build_graph_btn = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Expanding)
+        size_policy_build_graph_btn.setHorizontalStretch(0)
+        size_policy_build_graph_btn.setVerticalStretch(0)
+        size_policy_build_graph_btn_flag = self.build_graph_btn.sizePolicy().hasHeightForWidth()
+        size_policy_build_graph_btn.setHeightForWidth(size_policy_build_graph_btn_flag)
+        self.build_graph_btn.setSizePolicy(size_policy_build_graph_btn)
+
+        self.graph_navigation_groupbox_layout.addWidget(self.build_graph_btn)
+
+        self.graph_info_panel_layout.addWidget(self.graph_params_panel, 0, 1, 1, 1)
+
+        self.graph_params_panel_layout.addWidget(self.graph_navigation_groupbox)
+        self.graph_tab_layout.addWidget(self.graph_info_panel)
+
+        self.graph_picture_panel = QWidget(self.graph_tab)
+        size_policy_graph_right = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        size_policy_graph_right.setHorizontalStretch(0)
+        size_policy_graph_right.setVerticalStretch(0)
+        size_policy_graph_right_flag = self.graph_picture_panel.sizePolicy().hasHeightForWidth()
+        size_policy_graph_right.setHeightForWidth(size_policy_graph_right_flag)
+        self.graph_picture_panel.setSizePolicy(size_policy_graph_right)
+
+        self.graph_tab_layout.addWidget(self.graph_picture_panel)
 
     def create_logging_layout(self):
         self.main_logging_groupbox = QGroupBox(self.central_widget)
