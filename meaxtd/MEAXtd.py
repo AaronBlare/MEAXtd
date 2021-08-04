@@ -344,6 +344,9 @@ class MEAXtd(QMainWindow):
     def cutoff_spinbox_change(self):
         self.logger.info(f"Cutoff: {self.graph_params_cutoff_spinbox.value()}% from top")
 
+    def burst_id_spinbox_change(self):
+        self.logger.info(f"Build graph for burst {self.burst_id_spinbox.value()}")
+
     def create_main_upper_layout(self):
         self.main_tab_upper_groupbox = QGroupBox(self.main_tab)
         main_tab_upper_size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -612,8 +615,9 @@ class MEAXtd(QMainWindow):
         delta = self.graph_params_delta_spinbox.value()
         num_frames = self.graph_params_tau_spinbox.value()
         cutoff = self.graph_params_cutoff_spinbox.value()
+        burst_id = self.burst_id_spinbox.value()
 
-        construct_delayed_spikes_graph(self.data, burst_method, delta, num_frames, cutoff)
+        construct_delayed_spikes_graph(self.data, burst_method, delta, num_frames, cutoff, burst_id)
 
         excluded_channels = self.excluded_channels
         excluded_channels.sort()
@@ -633,7 +637,8 @@ class MEAXtd(QMainWindow):
             self.highlight_none_rb.setCheckable(True)
             self.highlight_none_rb.setChecked(True)
             self.highlight_spike_rb.setCheckable(True)
-            self.highlight_burstlet_rb.setCheckable(True)
+            if self.burst_method_combobox.currentText() == 'Burstlet':
+                self.highlight_burstlet_rb.setCheckable(True)
             self.highlight_burst_rb.setCheckable(True)
             self.stat.plot_colormap(self.stat_right_groupbox_layout)
 
@@ -666,11 +671,25 @@ class MEAXtd(QMainWindow):
             self.char_burst_table.setColumnCount(len(headers))
             self.char_burst_table.setRowCount(len(self.data.bursts))
             self.char_burst_table.setHorizontalHeaderLabels(headers)
+
+            self.graph_table.setColumnCount(len(headers))
+            self.graph_table.setRowCount(len(self.data.bursts))
+            self.graph_table.setHorizontalHeaderLabels(headers)
+
             for burst_id in range(0, len(self.data.bursts)):
                 for n, key in enumerate(self.data.burst_characteristics):
                     self.char_burst_table.setItem(burst_id, n, QTableWidgetItem(
                         str(self.data.burst_characteristics[key][burst_id])))
+
+                    self.graph_table.setItem(burst_id, n, QTableWidgetItem(
+                        str(self.data.burst_characteristics[key][burst_id])))
+
             self.char_burst_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+            self.graph_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+
+            self.burst_id_spinbox.setMinimum(1)
+            self.burst_id_spinbox.setMaximum(len(self.data.bursts))
+            self.burst_id_spinbox.setValue(1)
 
         if self.data.time_characteristics:
             headers = list(self.data.time_characteristics.keys())
@@ -1203,6 +1222,7 @@ class MEAXtd(QMainWindow):
 
         self.graph_table = QTableWidget(self.graph_info_panel)
         self.graph_info_panel_layout.addWidget(self.graph_table, 0, 0, 1, 1)
+        self.graph_table.verticalHeader().setVisible(False)
 
         self.graph_params_panel = QWidget(self.graph_info_panel)
         self.graph_params_panel_layout = QVBoxLayout(self.graph_params_panel)
@@ -1263,24 +1283,27 @@ class MEAXtd(QMainWindow):
         size_policy_graph_navigation.setHeightForWidth(size_policy_graph_navigation_flag)
         self.graph_navigation_groupbox.setSizePolicy(size_policy_graph_navigation)
         self.graph_navigation_groupbox.setFont(self.gbox_font)
-        self.graph_navigation_groupbox_layout = QHBoxLayout(self.graph_navigation_groupbox)
-        self.graph_navigation_groupbox_layout.setContentsMargins(50, 50, 50, 50)
+        self.graph_navigation_groupbox_layout = QGridLayout(self.graph_navigation_groupbox)
+        self.graph_navigation_groupbox_layout.setContentsMargins(50, 20, 50, 20)
+        self.graph_navigation_groupbox_layout.setSpacing(40)
 
-        self.burst_number_combobox = QComboBox(self.graph_navigation_groupbox)
-        self.graph_navigation_groupbox_layout.addWidget(self.burst_number_combobox)
+        self.burst_id_label = QLabel(self.graph_navigation_groupbox, text="Burst")
+        self.graph_navigation_groupbox_layout.addWidget(self.burst_id_label, 0, 0, 1, 1)
 
-        self.horizontalSpacer = QSpacerItem(70, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
-        self.graph_navigation_groupbox_layout.addItem(self.horizontalSpacer)
+        self.burst_id_spinbox = QSpinBox(self.graph_navigation_groupbox)
+        self.burst_id_spinbox.setValue(1)
+        self.burst_id_spinbox.valueChanged.connect(self.burst_id_spinbox_change)
+        self.graph_navigation_groupbox_layout.addWidget(self.burst_id_spinbox, 0, 1, 1, 1)
 
         self.build_graph_btn = QPushButton(self.graph_navigation_groupbox, text="Build Graph")
-        size_policy_build_graph_btn = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Expanding)
+        size_policy_build_graph_btn = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
         size_policy_build_graph_btn.setHorizontalStretch(0)
         size_policy_build_graph_btn.setVerticalStretch(0)
         size_policy_build_graph_btn_flag = self.build_graph_btn.sizePolicy().hasHeightForWidth()
         size_policy_build_graph_btn.setHeightForWidth(size_policy_build_graph_btn_flag)
         self.build_graph_btn.setSizePolicy(size_policy_build_graph_btn)
 
-        self.graph_navigation_groupbox_layout.addWidget(self.build_graph_btn)
+        self.graph_navigation_groupbox_layout.addWidget(self.build_graph_btn, 1, 0, 1, 2)
 
         self.graph_info_panel_layout.addWidget(self.graph_params_panel, 0, 1, 1, 1)
 

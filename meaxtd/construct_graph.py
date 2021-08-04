@@ -81,15 +81,8 @@ def get_electrode_info(num_channels):
     return electrode_info
 
 
-def construct_delayed_spikes_graph(data, burst_method, delta, num_frames, cutoff):
+def construct_delayed_spikes_graph(data, burst_method, delta, num_frames, cutoff, burst_id):
     num_channels = data.stream.shape[1]
-    burst_id = 0
-    max_len = 0
-    for curr_burst_id in range(0, len(data.bursts)):
-        curr_len = data.bursts[curr_burst_id]['end'] - data.bursts[curr_burst_id]['start']
-        if curr_len > max_len:
-            max_len = curr_len
-            burst_id = curr_burst_id
     curr_burst = data.bursts[burst_id]
     if burst_method == 'Burstlet':
         curr_burst = list(curr_burst)
@@ -98,7 +91,7 @@ def construct_delayed_spikes_graph(data, burst_method, delta, num_frames, cutoff
         curr_channels = list(
             set([curr_burst[interval_id].data['signal_id'] for interval_id in range(0, len(curr_burst))]))
         curr_channels.sort()
-    if burst_method == 'TSR':
+    elif burst_method == 'TSR':
         curr_burst_start = curr_burst['start']
         curr_burst_end = curr_burst['end']
         curr_channels = curr_burst['channels']
