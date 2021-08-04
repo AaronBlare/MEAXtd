@@ -81,7 +81,7 @@ def get_electrode_info(num_channels):
     return electrode_info
 
 
-def construct_delayed_spikes_graph(data, burst_method):
+def construct_delayed_spikes_graph(data, burst_method, delta, num_frames, cutoff):
     num_channels = data.stream.shape[1]
     burst_id = 0
     max_len = 0
@@ -103,12 +103,12 @@ def construct_delayed_spikes_graph(data, burst_method):
         curr_burst_end = curr_burst['end']
         curr_channels = curr_burst['channels']
     sampling_rate = (data.time[1] - data.time[0]) * 1000  # in ms
-    if sampling_rate >= 0.05:  # frame size = 0.05 ms (should be equal or higher than sampling rate)
+    if sampling_rate >= delta:  # frame size = delta (should be equal or higher than sampling rate, default: 0.05 ms)
         frame_size = 1
     else:
-        frame_size = int(0.05 // sampling_rate)
-    num_frames = round((curr_burst_end - curr_burst_start + 1) / frame_size)
-    tau_list = list(range(1, 51)) * frame_size
+        frame_size = int(delta // sampling_rate)
+    #num_frames = round((curr_burst_end - curr_burst_start + 1) / frame_size)
+    tau_list = list(range(1, num_frames + 1)) * frame_size
 
     electrode_info = get_electrode_info(num_channels)
     electrode_frame_dict = {}
@@ -155,7 +155,7 @@ def construct_delayed_spikes_graph(data, burst_method):
 
     c_ij_unsorted_df = pd.DataFrame.from_dict(c_ij_dict)
     c_ij_sorted_df = c_ij_unsorted_df.sort_values(by=['C_ij_max'], ascending=False)
-    percentile_value = np.percentile(c_ij_sorted_df['C_ij_max'], 95)
+    percentile_value = np.percentile(c_ij_sorted_df['C_ij_max'], 100 - cutoff)
     c_ij_top = c_ij_sorted_df[c_ij_sorted_df['C_ij_max'] > percentile_value]
 
     graph = pgv.AGraph(directed=True, strict=True)

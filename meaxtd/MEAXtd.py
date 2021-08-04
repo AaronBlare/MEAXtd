@@ -335,6 +335,15 @@ class MEAXtd(QMainWindow):
 
         button.clicked.connect(lambda curr_button=button: self.include_exclude_channel(button))
 
+    def delta_spinbox_change(self):
+        self.logger.info(f"Delta: {self.graph_params_delta_spinbox.value()}")
+
+    def tau_spinbox_change(self):
+        self.logger.info(f"Number of frames: {self.graph_params_tau_spinbox.value()}")
+
+    def cutoff_spinbox_change(self):
+        self.logger.info(f"Cutoff: {self.graph_params_cutoff_spinbox.value()}% from top")
+
     def create_main_upper_layout(self):
         self.main_tab_upper_groupbox = QGroupBox(self.main_tab)
         main_tab_upper_size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -600,7 +609,11 @@ class MEAXtd(QMainWindow):
         self.logger.info(f"TSR threshold: {np.mean(self.data.TSR) + burst_param * np.std(self.data.TSR)}")
         self.logger.info(f"TSR mean: {np.mean(self.data.TSR)}; TSR std: {np.std(self.data.TSR)}")
 
-        construct_delayed_spikes_graph(self.data, burst_method)
+        delta = self.graph_params_delta_spinbox.value()
+        num_frames = self.graph_params_tau_spinbox.value()
+        cutoff = self.graph_params_cutoff_spinbox.value()
+
+        construct_delayed_spikes_graph(self.data, burst_method, delta, num_frames, cutoff)
 
         excluded_channels = self.excluded_channels
         excluded_channels.sort()
@@ -1207,22 +1220,37 @@ class MEAXtd(QMainWindow):
         self.graph_delta_param_label = QLabel(self.graph_params_groupbox, text="Delta, ms")
         self.graph_params_groupbox_layout.addWidget(self.graph_delta_param_label, 0, 0, 1, 1)
         self.graph_delta_param_label.setToolTip("Size of delayed spike detection step")
+        self.graph_delta_param_label.setToolTipDuration(1000)
 
         self.graph_params_delta_spinbox = QDoubleSpinBox(self.graph_params_groupbox)
+        self.graph_params_delta_spinbox.setMinimum(0)
+        self.graph_params_delta_spinbox.setMaximum(10)
+        self.graph_params_delta_spinbox.setValue(0.05)
+        self.graph_params_delta_spinbox.valueChanged.connect(self.delta_spinbox_change)
         self.graph_params_groupbox_layout.addWidget(self.graph_params_delta_spinbox, 0, 1, 1, 1)
 
         self.graph_tau_param_label = QLabel(self.graph_params_groupbox, text="Num frames")
         self.graph_params_groupbox_layout.addWidget(self.graph_tau_param_label, 1, 0, 1, 1)
         self.graph_tau_param_label.setToolTip("Maximum correlation time-shift in frames")
+        self.graph_tau_param_label.setToolTipDuration(1000)
 
         self.graph_params_tau_spinbox = QSpinBox(self.graph_params_groupbox)
+        self.graph_params_tau_spinbox.setMinimum(0)
+        self.graph_params_tau_spinbox.setMaximum(1000)
+        self.graph_params_tau_spinbox.setValue(50)
+        self.graph_params_tau_spinbox.valueChanged.connect(self.tau_spinbox_change)
         self.graph_params_groupbox_layout.addWidget(self.graph_params_tau_spinbox, 1, 1, 1, 1)
 
         self.graph_cutoff_param_label = QLabel(self.graph_params_groupbox, text="Cutoff top, %")
         self.graph_params_groupbox_layout.addWidget(self.graph_cutoff_param_label, 2, 0, 1, 1)
         self.graph_cutoff_param_label.setToolTip("Choose top % of C_ij")
+        self.graph_cutoff_param_label.setToolTipDuration(1000)
 
         self.graph_params_cutoff_spinbox = QSpinBox(self.graph_params_groupbox)
+        self.graph_params_cutoff_spinbox.setMinimum(0)
+        self.graph_params_cutoff_spinbox.setMaximum(100)
+        self.graph_params_cutoff_spinbox.setValue(5)
+        self.graph_params_cutoff_spinbox.valueChanged.connect(self.cutoff_spinbox_change)
         self.graph_params_groupbox_layout.addWidget(self.graph_params_cutoff_spinbox, 2, 1, 1, 1)
 
         self.graph_params_panel_layout.addWidget(self.graph_params_groupbox)
@@ -1241,7 +1269,7 @@ class MEAXtd(QMainWindow):
         self.burst_number_combobox = QComboBox(self.graph_navigation_groupbox)
         self.graph_navigation_groupbox_layout.addWidget(self.burst_number_combobox)
 
-        self.horizontalSpacer = QSpacerItem(40, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+        self.horizontalSpacer = QSpacerItem(70, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
         self.graph_navigation_groupbox_layout.addItem(self.horizontalSpacer)
 
         self.build_graph_btn = QPushButton(self.graph_navigation_groupbox, text="Build Graph")
