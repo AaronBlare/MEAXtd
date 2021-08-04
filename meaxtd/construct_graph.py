@@ -81,7 +81,7 @@ def get_electrode_info(num_channels):
     return electrode_info
 
 
-def construct_delayed_spikes_graph(data, burst_method, delta, num_frames, cutoff, burst_id):
+def construct_delayed_spikes_graph(data, progress_callback, burst_method, delta, num_frames, cutoff, burst_id):
     num_channels = data.stream.shape[1]
     curr_burst = data.bursts[burst_id]
     if burst_method == 'Burstlet':
@@ -103,19 +103,26 @@ def construct_delayed_spikes_graph(data, burst_method, delta, num_frames, cutoff
     #num_frames = round((curr_burst_end - curr_burst_start + 1) / frame_size)
     tau_list = list(range(1, num_frames + 1)) * frame_size
 
+    progress_callback.emit(10)
+
     electrode_info = get_electrode_info(num_channels)
     electrode_frame_dict = {}
+    channel_id = 0
     for channel in curr_channels:
+        progress_callback.emit(10 + round(channel_id * 20 / len(curr_channels)))
         electrode_frame_dict[channel] = {}
         electrode_frame_dict[channel]['X'] = electrode_info[channel]['X']
         electrode_frame_dict[channel]['Y'] = electrode_info[channel]['Y']
         start_id = np.searchsorted(data.spikes[channel], curr_burst_start)
         end_id = np.searchsorted(data.spikes[channel], curr_burst_end)
         electrode_frame_dict[channel]['Spikes'] = data.spikes[channel][start_id:end_id]
+        channel_id += 1
 
     c_ij_dict = {'Channel 1': [], 'Channel 2': [], 'Num spikes channel 1': [], 'Num spikes channel 2': [],
                  'Num delayed spikes': [], 'C_ij_max': [], 'tau': []}
+    channel_id = 0
     for channel_1 in curr_channels:
+        progress_callback.emit(30 + round(channel_id * 50 / len(curr_channels)))
         for channel_2 in curr_channels:
             if channel_2 != channel_1:
                 spikes_channel_1 = electrode_frame_dict[channel_1]['Spikes']
@@ -145,11 +152,14 @@ def construct_delayed_spikes_graph(data, burst_method, delta, num_frames, cutoff
                         c_ij_dict['Num delayed spikes'].append(num_del_sync_spikes)
                         c_ij_dict['C_ij_max'].append(c_ij)
                         c_ij_dict['tau'].append(max_tau)
+        channel_id += 1
 
     c_ij_unsorted_df = pd.DataFrame.from_dict(c_ij_dict)
     c_ij_sorted_df = c_ij_unsorted_df.sort_values(by=['C_ij_max'], ascending=False)
     percentile_value = np.percentile(c_ij_sorted_df['C_ij_max'], 100 - cutoff)
     c_ij_top = c_ij_sorted_df[c_ij_sorted_df['C_ij_max'] > percentile_value]
+
+    progress_callback.emit(90)
 
     graph = pgv.AGraph(directed=True, strict=True)
     curr_nodes = set(c_ij_top['Channel 1']).union(c_ij_top['Channel 2'])
@@ -169,3 +179,5 @@ def construct_delayed_spikes_graph(data, burst_method, delta, num_frames, cutoff
         graph.add_edge(cell_1, cell_2, weight=nodes[cell_2]['post'], label=f"{list(c_ij_top['tau'])[edge_id]}ms")
     graph.layout("dot")
     data.graph = graph
+
+    progress_callback.emit(99)

@@ -101,11 +101,17 @@ def save_params_to_file(path, progress_callback, params_dict):
     with open(path + 'params.json', 'w') as f:
         json.dump(params_dict, f)
 
-    progress_callback.emit(99)
+    progress_callback.emit(100)
 
 
-def save_graph_to_file(path, progress_callback, graph):
+def save_graph_to_file(path, progress_callback, graph, burst_id):
 
-    graph.draw(path + 'graph.png')
+    path = f"{path}/graph/"
+    if not os.path.isdir(path):
+        Path(path).mkdir(parents=True)
+
+    graph.draw(path + 'graph_burst_' + str(burst_id) + '.png')
+    graph.draw(path + 'graph_burst_' + str(burst_id) + '.pdf')
+    graph.draw(path + 'graph_burst_' + str(burst_id) + '.dot')
 
     progress_callback.emit(100)

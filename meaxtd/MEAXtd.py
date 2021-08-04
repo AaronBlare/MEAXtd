@@ -612,13 +612,6 @@ class MEAXtd(QMainWindow):
         self.logger.info(f"TSR threshold: {np.mean(self.data.TSR) + burst_param * np.std(self.data.TSR)}")
         self.logger.info(f"TSR mean: {np.mean(self.data.TSR)}; TSR std: {np.std(self.data.TSR)}")
 
-        delta = self.graph_params_delta_spinbox.value()
-        num_frames = self.graph_params_tau_spinbox.value()
-        cutoff = self.graph_params_cutoff_spinbox.value()
-        burst_id = self.burst_id_spinbox.value()
-
-        construct_delayed_spikes_graph(self.data, burst_method, delta, num_frames, cutoff, burst_id)
-
         excluded_channels = self.excluded_channels
         excluded_channels.sort()
         excluded_channels = [channel + 1 for channel in excluded_channels]
@@ -689,7 +682,6 @@ class MEAXtd(QMainWindow):
 
             self.burst_id_spinbox.setMinimum(1)
             self.burst_id_spinbox.setMaximum(len(self.data.bursts))
-            self.burst_id_spinbox.setValue(1)
 
         if self.data.time_characteristics:
             headers = list(self.data.time_characteristics.keys())
@@ -709,7 +701,8 @@ class MEAXtd(QMainWindow):
 
         save_params_to_file(self.path_to_save, progress_callback, params_dict)
 
-        save_graph_to_file(self.path_to_save, progress_callback, self.data.graph)
+        if self.data.bursts:
+            self.build_graph_btn.setEnabled(True)
 
     def save_characteristics(self):
         self.logger.info(f"Characteristics saved to {self.path_to_save}")
@@ -732,6 +725,28 @@ class MEAXtd(QMainWindow):
                 self.threadpool.start(worker)
             else:
                 self.logger.info("Spikes and bursts already found.")
+
+    def process_graph_pipeline(self, progress_callback):
+        burst_method = self.burst_method_combobox.currentText()
+
+        delta = self.graph_params_delta_spinbox.value()
+        num_frames = self.graph_params_tau_spinbox.value()
+        cutoff = self.graph_params_cutoff_spinbox.value()
+        burst_id = self.burst_id_spinbox.value()
+
+        self.logger.info(f"Graph for burst {burst_id} building...")
+
+        construct_delayed_spikes_graph(self.data, progress_callback, burst_method, delta, num_frames, cutoff, burst_id)
+
+        self.logger.info(f"Graph for burst {burst_id} built.")
+
+        save_graph_to_file(self.path_to_save, progress_callback, self.data.graph, burst_id)
+
+    def process_graph(self):
+        if self.data.bursts:
+            worker = Worker(self.process_graph_pipeline)
+            worker.signals.progress.connect(self.set_progress_value)
+            self.threadpool.start(worker)
 
     def create_param_groupbox(self):
         self.param_layout = QHBoxLayout(self.main_tab_param_widget)
@@ -1302,6 +1317,8 @@ class MEAXtd(QMainWindow):
         size_policy_build_graph_btn_flag = self.build_graph_btn.sizePolicy().hasHeightForWidth()
         size_policy_build_graph_btn.setHeightForWidth(size_policy_build_graph_btn_flag)
         self.build_graph_btn.setSizePolicy(size_policy_build_graph_btn)
+        self.build_graph_btn.setDisabled(True)
+        self.build_graph_btn.clicked.connect(lambda: self.process_graph())
 
         self.graph_navigation_groupbox_layout.addWidget(self.build_graph_btn, 1, 0, 1, 2)
 
