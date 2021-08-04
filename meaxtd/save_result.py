@@ -110,8 +110,10 @@ def save_graph_to_file(path, progress_callback, graph, burst_id):
     if not os.path.isdir(path):
         Path(path).mkdir(parents=True)
 
-    graph.draw(path + 'graph_burst_' + str(burst_id) + '.png')
-    graph.draw(path + 'graph_burst_' + str(burst_id) + '.pdf')
-    graph.draw(path + 'graph_burst_' + str(burst_id) + '.dot')
+    graph.draw(path + 'graph_burst_' + str(burst_id + 1) + '.png')
+    graph.draw(path + 'graph_burst_' + str(burst_id + 1) + '.pdf')
+    graph.draw(path + 'graph_burst_' + str(burst_id + 1) + '.dot')
 
     progress_callback.emit(100)
+
+    return path + 'graph_burst_' + str(burst_id + 1) + '.png'

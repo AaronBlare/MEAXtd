@@ -463,7 +463,7 @@ def calculate_characteristics(data, start, end, progress_callback):
         signal_set = list(set(signal_list))
         num_channels.append(len(signal_set))
         signal_set.sort()
-        signals.append('; '.join([str(item) for item in signal_set]))
+        signals.append('; '.join([str(item + 1) for item in signal_set]))
         num_spikes_per_burst.append(curr_num_spikes)
     bursts_duration = []
     for burst_id in range(0, len(bursts_starts)):

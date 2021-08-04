@@ -10,8 +10,8 @@ from meaxtd.construct_graph import construct_delayed_spikes_graph
 from meaxtd.save_result import save_tables_to_file, save_plots_to_file, save_params_to_file, save_graph_to_file
 from meaxtd.stat_plots import raster_plot, tsr_plot, colormap_plot
 from PySide2.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal, QSize
-from PySide2.QtGui import QFont
-from PySide2.QtWidgets import (QApplication, QDialog, QFileDialog, QLayout, QFrame, QSizePolicy, QAction, QFormLayout,
+from PySide2.QtGui import QFont, QPixmap
+from PySide2.QtWidgets import (QApplication, QDialog, QFileDialog, QLayout, QFrame, QSizePolicy, QAction,
                                QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget, QTabWidget, QSpacerItem,
                                QGroupBox, QGridLayout, QPushButton, QComboBox, QRadioButton, QPlainTextEdit,
                                QProgressBar, QDoubleSpinBox, QSpinBox, QTableWidget, QTableWidgetItem, QHeaderView,
@@ -19,6 +19,7 @@ from PySide2.QtWidgets import (QApplication, QDialog, QFileDialog, QLayout, QFra
 
 pg.setConfigOption('background', 'w')
 pg.setConfigOption('foreground', 'k')
+pg.setConfigOption('imageAxisOrder', 'row-major')
 
 
 class WorkerSignals(QObject):
@@ -283,7 +284,7 @@ class MEAXtd(QMainWindow):
             self.burst_param.setDecimals(2)
             self.burst_param.setMinimum(-100.0)
             self.burst_param.setMaximum(100.0)
-            self.burst_param.setValue(1.0)
+            self.burst_param.setValue(0.1)
         self.param_change = True
 
     def spike_spinbox_change(self):
@@ -529,7 +530,7 @@ class MEAXtd(QMainWindow):
             self.burst_param.setDecimals(2)
             self.burst_param.setMinimum(-100.0)
             self.burst_param.setMaximum(100.0)
-            self.burst_param.setValue(1.0)
+            self.burst_param.setValue(0.1)
         self.burst_param.valueChanged.connect(self.burst_parameter_spinbox_change)
         self.burst_grid_layout.addWidget(self.burst_param, 2, 1, 1, 1)
 
@@ -674,8 +675,10 @@ class MEAXtd(QMainWindow):
                     self.char_burst_table.setItem(burst_id, n, QTableWidgetItem(
                         str(self.data.burst_characteristics[key][burst_id])))
 
-                    self.graph_table.setItem(burst_id, n, QTableWidgetItem(
-                        str(self.data.burst_characteristics[key][burst_id])))
+                    curr_item = self.data.burst_characteristics[key][burst_id]
+                    if isinstance(self.data.burst_characteristics[key][burst_id], float):
+                        curr_item = round(self.data.burst_characteristics[key][burst_id], 2)
+                    self.graph_table.setItem(burst_id, n, QTableWidgetItem(str(curr_item)))
 
             self.char_burst_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
             self.graph_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
@@ -732,15 +735,23 @@ class MEAXtd(QMainWindow):
         delta = self.graph_params_delta_spinbox.value()
         num_frames = self.graph_params_tau_spinbox.value()
         cutoff = self.graph_params_cutoff_spinbox.value()
-        burst_id = self.burst_id_spinbox.value()
+        burst_id = self.burst_id_spinbox.value() - 1
 
-        self.logger.info(f"Graph for burst {burst_id} building...")
+        self.logger.info(f"Graph for burst {burst_id + 1} building...")
 
         construct_delayed_spikes_graph(self.data, progress_callback, burst_method, delta, num_frames, cutoff, burst_id)
 
-        self.logger.info(f"Graph for burst {burst_id} built.")
+        self.logger.info(f"Graph for burst {burst_id + 1} built.")
 
-        save_graph_to_file(self.path_to_save, progress_callback, self.data.graph, burst_id)
+        graph_file = save_graph_to_file(self.path_to_save, progress_callback, self.data.graph, burst_id)
+
+        pixmap = QPixmap.fromImage(graph_file)
+        if pixmap.height() > self.graph_picture_panel.height() or pixmap.width() > self.graph_picture_panel.width():
+            pixmap_scaled = pixmap.scaled(0.9 * self.graph_picture_panel.size(),
+                                          Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.graph_picture.setPixmap(pixmap_scaled)
+        else:
+            self.graph_picture.setPixmap(pixmap)
 
     def process_graph(self):
         if self.data.bursts:
@@ -1228,7 +1239,7 @@ class MEAXtd(QMainWindow):
     def create_graph_layout(self):
         self.graph_info_panel = QWidget(self.graph_tab)
         size_policy_graph_left = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        size_policy_graph_left.setHorizontalStretch(0)
+        size_policy_graph_left.setHorizontalStretch(1)
         size_policy_graph_left.setVerticalStretch(0)
         size_policy_graph_left_flag = self.graph_info_panel.sizePolicy().hasHeightForWidth()
         size_policy_graph_left.setHeightForWidth(size_policy_graph_left_flag)
@@ -1329,11 +1340,15 @@ class MEAXtd(QMainWindow):
 
         self.graph_picture_panel = QWidget(self.graph_tab)
         size_policy_graph_right = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        size_policy_graph_right.setHorizontalStretch(0)
+        size_policy_graph_right.setHorizontalStretch(1)
         size_policy_graph_right.setVerticalStretch(0)
         size_policy_graph_right_flag = self.graph_picture_panel.sizePolicy().hasHeightForWidth()
         size_policy_graph_right.setHeightForWidth(size_policy_graph_right_flag)
         self.graph_picture_panel.setSizePolicy(size_policy_graph_right)
+        self.graph_picture_panel_layout = QVBoxLayout(self.graph_picture_panel)
+
+        self.graph_picture = QLabel(self.graph_picture_panel)
+        self.graph_picture_panel_layout.addWidget(self.graph_picture, alignment=Qt.AlignCenter)
 
         self.graph_tab_layout.addWidget(self.graph_picture_panel)
 
