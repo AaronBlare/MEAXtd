@@ -4,6 +4,7 @@ import pyqtgraph as pg
 import pyqtgraph.exporters
 import datetime
 import json
+from pathlib import Path
 
 
 def save_tables_to_file(data, filepath, progress_callback):
@@ -23,7 +24,7 @@ def save_tables_to_file(data, filepath, progress_callback):
     suffix = f"{str(curr_date)}_{curr_hour}-{curr_minute}-{curr_second}"
     path = f"{path}/{suffix}/"
     if not os.path.isdir(path):
-        os.mkdir(path)
+        Path(path).mkdir(parents=True)
 
     global_df = pd.DataFrame(data=data.global_characteristics, index=[0])
     global_df.to_excel(path + 'global.xlsx', index=False)
@@ -97,9 +98,22 @@ def save_params_to_file(path, progress_callback, params_dict):
             f.write(f'{key}\t{str(params_dict[key])}\n')
     f.close()
 
-    progress_callback.emit(99)
-
     with open(path + 'params.json', 'w') as f:
         json.dump(params_dict, f)
 
     progress_callback.emit(100)
+
+
+def save_graph_to_file(path, progress_callback, graph, burst_id):
+
+    path = f"{path}/graph/"
+    if not os.path.isdir(path):
+        Path(path).mkdir(parents=True)
+
+    graph.draw(path + 'graph_burst_' + str(burst_id + 1) + '.png')
+    graph.draw(path + 'graph_burst_' + str(burst_id + 1) + '.pdf')
+    graph.draw(path + 'graph_burst_' + str(burst_id + 1) + '.dot')
+
+    progress_callback.emit(100)
+
+    return path + 'graph_burst_' + str(burst_id + 1) + '.png'

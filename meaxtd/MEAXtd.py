@@ -6,17 +6,20 @@ import logging
 from meaxtd.read_h5 import read_h5_file
 from meaxtd.hdf5plot import HDF5PlotXY
 from meaxtd.find_bursts import find_spikes, find_bursts, calculate_characteristics
-from meaxtd.save_result import save_tables_to_file, save_plots_to_file, save_params_to_file
+from meaxtd.construct_graph import construct_delayed_spikes_graph
+from meaxtd.save_result import save_tables_to_file, save_plots_to_file, save_params_to_file, save_graph_to_file
 from meaxtd.stat_plots import raster_plot, tsr_plot, colormap_plot
 from PySide6.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal
 from PySide6.QtGui import QIcon, QFont, QAction, QScreen
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QLayout, QFrame, QSizePolicy,
                                QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget, QTabWidget, QSpacerItem,
                                QGroupBox, QGridLayout, QPushButton, QComboBox, QRadioButton, QPlainTextEdit,
-                               QProgressBar, QDoubleSpinBox, QSpinBox, QTableWidget, QTableWidgetItem, QHeaderView)
+                               QProgressBar, QDoubleSpinBox, QSpinBox, QTableWidget, QTableWidgetItem, QHeaderView,
+                               QStyleFactory)
 
 pg.setConfigOption('background', 'w')
 pg.setConfigOption('foreground', 'k')
+pg.setConfigOption('imageAxisOrder', 'row-major')
 
 
 class WorkerSignals(QObject):
@@ -113,7 +116,7 @@ class MEAXtd(QMainWindow):
         self.menu_bar = self.menuBar()
         self.about_dialog = AboutDialog()
         self.status_bar = self.statusBar()
-        self.status_bar.showMessage('Ready')
+        # self.status_bar.showMessage('Ready')
         self.file_menu()
         self.help_menu()
 
@@ -124,15 +127,21 @@ class MEAXtd(QMainWindow):
         central_flag = self.central_widget.sizePolicy().hasHeightForWidth()
         central_size_policy.setHeightForWidth(central_flag)
         self.central_widget.setSizePolicy(central_size_policy)
-        self.main_layout = QHBoxLayout(self.central_widget)
+        self.main_layout = QVBoxLayout(self.central_widget)
         self.main_layout.setSizeConstraint(QLayout.SetNoConstraint)
 
         self.tabs = QTabWidget(self.central_widget)
+        tab_size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        tab_size_policy.setHorizontalStretch(0)
+        tab_size_policy.setVerticalStretch(10)
+        tab_size_policy_flag = self.tabs.sizePolicy().hasHeightForWidth()
+        tab_size_policy.setHeightForWidth(tab_size_policy_flag)
+        self.tabs.setSizePolicy(tab_size_policy)
+        self.tabs.setFocusPolicy(Qt.ClickFocus)
 
         self.main_tab = QWidget()
         self.main_tab_upper_layout = QVBoxLayout(self.main_tab)
         self.create_main_upper_layout()
-        self.create_main_bottom_layout()
 
         self.plot_tab = QWidget()
         self.plot_tab_layout = QVBoxLayout(self.plot_tab)
@@ -147,12 +156,20 @@ class MEAXtd(QMainWindow):
         self.char_tab_layout = QGridLayout(self.char_tab)
         self.create_char_layout()
 
+        self.graph_tab = QWidget()
+        self.graph_tab_layout = QHBoxLayout(self.graph_tab)
+        self.create_graph_layout()
+
         self.tabs.addTab(self.main_tab, "Main")
         self.tabs.addTab(self.plot_tab, "Signal")
         self.tabs.addTab(self.stat_tab, "Plots")
         self.tabs.addTab(self.char_tab, "Characteristics")
+        self.tabs.addTab(self.graph_tab, "Graphs")
 
         self.main_layout.addWidget(self.tabs)
+
+        self.create_logging_layout()
+
         self.setCentralWidget(self.central_widget)
         self.center()
 
@@ -251,6 +268,24 @@ class MEAXtd(QMainWindow):
         self.logger.info(f"Spike method: {self.spike_method_combobox.currentText()}")
         self.param_change = True
 
+    def burst_combobox_change(self):
+        self.logger.info(f"Burst method: {self.burst_method_combobox.currentText()}")
+        if self.burst_method_combobox.currentText() == 'Burstlet':
+            self.burst_param_label.setText("Num channels")
+            self.burst_param_label.setToolTip("Minimal number of channels for burst")
+            self.burst_param.setDecimals(0)
+            self.burst_param.setMinimum(0)
+            self.burst_param.setMaximum(60)
+            self.burst_param.setValue(5)
+        if self.burst_method_combobox.currentText() == 'TSR':
+            self.burst_param_label.setText("Threshold coefficient")
+            self.burst_param_label.setToolTip("Coefficient for threshold: mean(TSR) + coeff * std(TSR)")
+            self.burst_param.setDecimals(2)
+            self.burst_param.setMinimum(-100.0)
+            self.burst_param.setMaximum(100.0)
+            self.burst_param.setValue(0.1)
+        self.param_change = True
+
     def spike_spinbox_change(self):
         self.logger.info(f"Spike coefficient: {self.spike_coeff.value()}")
         self.param_change = True
@@ -259,8 +294,11 @@ class MEAXtd(QMainWindow):
         self.logger.info(f"Burst window: {self.burst_window_size.value()} ms")
         self.param_change = True
 
-    def burst_channels_spinbox_change(self):
-        self.logger.info(f"Num channels for bursting: {self.burst_num_channels.value()}")
+    def burst_parameter_spinbox_change(self):
+        if self.burst_method_combobox.currentText() == 'Burstlet':
+            self.logger.info(f"Num channels for bursting: {int(self.burst_param.value())}")
+        if self.burst_method_combobox.currentText() == 'TSR':
+            self.logger.info(f"TSR threshold coefficient: {self.burst_param.value()}")
         self.param_change = True
 
     def start_time_spinbox_change(self):
@@ -297,11 +335,23 @@ class MEAXtd(QMainWindow):
 
         button.clicked.connect(lambda curr_button=button: self.include_exclude_channel(button))
 
+    def delta_spinbox_change(self):
+        self.logger.info(f"Delta: {self.graph_params_delta_spinbox.value()}")
+
+    def tau_spinbox_change(self):
+        self.logger.info(f"Number of frames: {self.graph_params_tau_spinbox.value()}")
+
+    def cutoff_spinbox_change(self):
+        self.logger.info(f"Cutoff: {self.graph_params_cutoff_spinbox.value()}% from top")
+
+    def burst_id_spinbox_change(self):
+        self.logger.info(f"Build graph for burst {self.burst_id_spinbox.value()}")
+
     def create_main_upper_layout(self):
         self.main_tab_upper_groupbox = QGroupBox(self.main_tab)
         main_tab_upper_size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         main_tab_upper_size_policy.setHorizontalStretch(0)
-        main_tab_upper_size_policy.setVerticalStretch(2)
+        main_tab_upper_size_policy.setVerticalStretch(0)
         policy_flag = self.main_tab_upper_groupbox.sizePolicy().hasHeightForWidth()
         main_tab_upper_size_policy.setHeightForWidth(policy_flag)
         self.main_tab_upper_groupbox.setSizePolicy(main_tab_upper_size_policy)
@@ -316,13 +366,11 @@ class MEAXtd(QMainWindow):
         policy_flag = self.frame.sizePolicy().hasHeightForWidth()
         button_frame_size_policy.setHeightForWidth(policy_flag)
         self.frame.setSizePolicy(button_frame_size_policy)
-        self.frame.setFrameShape(QFrame.StyledPanel)
-        self.frame.setFrameShadow(QFrame.Raised)
         self.main_tab_button_layout = QVBoxLayout(self.frame)
         self.main_tab_button_layout.setContentsMargins(70, 50, 70, 50)
         self.load_button()
 
-        self.verticalSpacer = QSpacerItem(20, 60, QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.verticalSpacer = QSpacerItem(20, 200, QSizePolicy.Minimum, QSizePolicy.Fixed)
         self.main_tab_button_layout.addItem(self.verticalSpacer)
 
         self.process_button()
@@ -431,10 +479,24 @@ class MEAXtd(QMainWindow):
         self.burst_grid_layout = QGridLayout(self.burst_param_groupbox)
         self.burst_grid_layout.setContentsMargins(50, 20, 50, 20)
 
+        self.burst_method_label = QLabel(self.burst_param_groupbox, text="Method")
+        self.burst_method_label.setToolTip("Method for burst searching")
+        self.burst_method_label.setToolTipDuration(1000)
+        self.burst_grid_layout.addWidget(self.burst_method_label, 0, 0, 1, 1)
+
+        self.burst_method_combobox = QComboBox(self.burst_param_groupbox)
+        policy_flag = self.burst_method_combobox.sizePolicy().hasHeightForWidth()
+        self.size_policy1.setHeightForWidth(policy_flag)
+        self.burst_method_combobox.setSizePolicy(self.size_policy1)
+        burst_methods = ['TSR', 'Burstlet']
+        self.burst_method_combobox.addItems(burst_methods)
+        self.burst_method_combobox.currentIndexChanged.connect(self.burst_combobox_change)
+        self.burst_grid_layout.addWidget(self.burst_method_combobox, 0, 1, 1, 1)
+
         self.burst_window_label = QLabel(self.burst_param_groupbox, text="Window size, ms")
         self.burst_window_label.setToolTip("Window size for burst")
         self.burst_window_label.setToolTipDuration(1000)
-        self.burst_grid_layout.addWidget(self.burst_window_label, 0, 0, 1, 1)
+        self.burst_grid_layout.addWidget(self.burst_window_label, 1, 0, 1, 1)
 
         self.burst_window_size = QSpinBox(self.burst_param_groupbox)
         policy_flag = self.burst_window_size.sizePolicy().hasHeightForWidth()
@@ -444,22 +506,34 @@ class MEAXtd(QMainWindow):
         self.burst_window_size.setMaximum(1000)
         self.burst_window_size.setValue(100)
         self.burst_window_size.valueChanged.connect(self.burst_window_spinbox_change)
-        self.burst_grid_layout.addWidget(self.burst_window_size, 0, 1, 1, 1)
+        self.burst_grid_layout.addWidget(self.burst_window_size, 1, 1, 1, 1)
 
-        self.burst_num_channels_label = QLabel(self.burst_param_groupbox, text="Num channels")
-        self.burst_num_channels_label.setToolTip("Minimal number of channels for burst")
-        self.burst_num_channels_label.setToolTipDuration(1000)
-        self.burst_grid_layout.addWidget(self.burst_num_channels_label, 1, 0, 1, 1)
+        self.burst_param_label = QLabel(self.burst_param_groupbox)
+        if self.burst_method_combobox.currentText() == 'Burstlet':
+            self.burst_param_label.setText("Num channels")
+            self.burst_param_label.setToolTip("Minimal number of channels for burst")
+        if self.burst_method_combobox.currentText() == 'TSR':
+            self.burst_param_label.setText("Threshold coefficient")
+            self.burst_param_label.setToolTip("Coefficient for threshold: mean(TSR) + coeff * std(TSR)")
+        self.burst_param_label.setToolTipDuration(1000)
+        self.burst_grid_layout.addWidget(self.burst_param_label, 2, 0, 1, 1)
 
-        self.burst_num_channels = QSpinBox(self.burst_param_groupbox)
-        policy_flag = self.burst_num_channels.sizePolicy().hasHeightForWidth()
+        self.burst_param = QDoubleSpinBox(self.burst_param_groupbox)
+        policy_flag = self.burst_param.sizePolicy().hasHeightForWidth()
         self.size_policy1.setHeightForWidth(policy_flag)
-        self.burst_num_channels.setSizePolicy(self.size_policy1)
-        self.burst_num_channels.setMinimum(0)
-        self.burst_num_channels.setMaximum(60)
-        self.burst_num_channels.setValue(5)
-        self.burst_num_channels.valueChanged.connect(self.burst_channels_spinbox_change)
-        self.burst_grid_layout.addWidget(self.burst_num_channels, 1, 1, 1, 1)
+        self.burst_param.setSizePolicy(self.size_policy1)
+        if self.burst_method_combobox.currentText() == 'Burstlet':
+            self.burst_param.setDecimals(0)
+            self.burst_param.setMinimum(0.0)
+            self.burst_param.setMaximum(60.0)
+            self.burst_param.setValue(5.0)
+        if self.burst_method_combobox.currentText() == 'TSR':
+            self.burst_param.setDecimals(2)
+            self.burst_param.setMinimum(-100.0)
+            self.burst_param.setMaximum(100.0)
+            self.burst_param.setValue(0.1)
+        self.burst_param.valueChanged.connect(self.burst_parameter_spinbox_change)
+        self.burst_grid_layout.addWidget(self.burst_param, 2, 1, 1, 1)
 
         self.params_frame_layout.addWidget(self.burst_param_groupbox)
 
@@ -528,10 +602,17 @@ class MEAXtd(QMainWindow):
             self.stat.plot_raster(self.stat_left_groupbox_layout)
             self.stat.plot_tsr(self.stat_left_groupbox_layout)
 
+        burst_method = self.burst_method_combobox.currentText()
         burst_window = self.burst_window_size.value()
-        burst_num_channels = self.burst_num_channels.value()
-        find_bursts(self.data, self.excluded_channels, spike_method, spike_coeff, burst_window, burst_num_channels,
-                    start, end, progress_callback)
+        if burst_method == 'Burstlet':
+            burst_param = int(self.burst_param.value())
+        if burst_method == 'TSR':
+            burst_param = self.burst_param.value()
+        find_bursts(self.data, self.excluded_channels, spike_method, spike_coeff, burst_method, burst_window,
+                    burst_param, start, end, progress_callback)
+
+        self.logger.info(f"TSR threshold: {np.mean(self.data.TSR) + burst_param * np.std(self.data.TSR)}")
+        self.logger.info(f"TSR mean: {np.mean(self.data.TSR)}; TSR std: {np.std(self.data.TSR)}")
 
         excluded_channels = self.excluded_channels
         excluded_channels.sort()
@@ -541,8 +622,9 @@ class MEAXtd(QMainWindow):
                        'Signal end, min': end,
                        'Spike method': spike_method,
                        'Spike coefficient': spike_coeff,
+                       'Burst method': burst_method,
                        'Burst window, ms': burst_window,
-                       'Burst num channels': burst_num_channels,
+                       'Burst param': burst_param,
                        'Excluded channels': excluded_channels}
 
         if self.data.bursts:
@@ -550,7 +632,8 @@ class MEAXtd(QMainWindow):
             self.highlight_none_rb.setCheckable(True)
             self.highlight_none_rb.setChecked(True)
             self.highlight_spike_rb.setCheckable(True)
-            self.highlight_burstlet_rb.setCheckable(True)
+            if self.burst_method_combobox.currentText() == 'Burstlet':
+                self.highlight_burstlet_rb.setCheckable(True)
             self.highlight_burst_rb.setCheckable(True)
             self.stat.plot_colormap(self.stat_right_groupbox_layout)
 
@@ -583,11 +666,26 @@ class MEAXtd(QMainWindow):
             self.char_burst_table.setColumnCount(len(headers))
             self.char_burst_table.setRowCount(len(self.data.bursts))
             self.char_burst_table.setHorizontalHeaderLabels(headers)
+
+            self.graph_table.setColumnCount(len(headers))
+            self.graph_table.setRowCount(len(self.data.bursts))
+            self.graph_table.setHorizontalHeaderLabels(headers)
+
             for burst_id in range(0, len(self.data.bursts)):
                 for n, key in enumerate(self.data.burst_characteristics):
                     self.char_burst_table.setItem(burst_id, n, QTableWidgetItem(
                         str(self.data.burst_characteristics[key][burst_id])))
+
+                    curr_item = self.data.burst_characteristics[key][burst_id]
+                    if isinstance(self.data.burst_characteristics[key][burst_id], float):
+                        curr_item = round(self.data.burst_characteristics[key][burst_id], 2)
+                    self.graph_table.setItem(burst_id, n, QTableWidgetItem(str(curr_item)))
+
             self.char_burst_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+            self.graph_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+
+            self.burst_id_spinbox.setMinimum(1)
+            self.burst_id_spinbox.setMaximum(len(self.data.bursts))
 
         if self.data.time_characteristics:
             headers = list(self.data.time_characteristics.keys())
@@ -606,6 +704,9 @@ class MEAXtd(QMainWindow):
                            self.stat_left_groupbox_layout, self.stat_right_groupbox_layout)
 
         save_params_to_file(self.path_to_save, progress_callback, params_dict)
+
+        if self.data.bursts:
+            self.build_graph_btn.setEnabled(True)
 
     def save_characteristics(self):
         self.logger.info(f"Characteristics saved to {self.path_to_save}")
@@ -629,6 +730,36 @@ class MEAXtd(QMainWindow):
             else:
                 self.logger.info("Spikes and bursts already found.")
 
+    def process_graph_pipeline(self, progress_callback):
+        burst_method = self.burst_method_combobox.currentText()
+
+        delta = self.graph_params_delta_spinbox.value()
+        num_frames = self.graph_params_tau_spinbox.value()
+        cutoff = self.graph_params_cutoff_spinbox.value()
+        burst_id = self.burst_id_spinbox.value() - 1
+
+        self.logger.info(f"Graph for burst {burst_id + 1} building...")
+
+        construct_delayed_spikes_graph(self.data, progress_callback, burst_method, delta, num_frames, cutoff, burst_id)
+
+        self.logger.info(f"Graph for burst {burst_id + 1} built.")
+
+        graph_file = save_graph_to_file(self.path_to_save, progress_callback, self.data.graph, burst_id)
+
+        pixmap = QPixmap.fromImage(graph_file)
+        if pixmap.height() > self.graph_picture_panel.height() or pixmap.width() > self.graph_picture_panel.width():
+            pixmap_scaled = pixmap.scaled(0.9 * self.graph_picture_panel.size(),
+                                          Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.graph_picture.setPixmap(pixmap_scaled)
+        else:
+            self.graph_picture.setPixmap(pixmap)
+
+    def process_graph(self):
+        if self.data.bursts:
+            worker = Worker(self.process_graph_pipeline)
+            worker.signals.progress.connect(self.set_progress_value)
+            self.threadpool.start(worker)
+
     def create_param_groupbox(self):
         self.param_layout = QHBoxLayout(self.main_tab_param_widget)
         self.param_groupbox = QGroupBox(self.main_tab_param_widget, title="Parameters")
@@ -640,226 +771,191 @@ class MEAXtd(QMainWindow):
     def add_signal_buttons(self):
         self.signal_button_1 = QPushButton('{}'.format(1), self)
         self.configure_signal_button(self.signal_button_1)
-        self.channels_enabled_layout.addWidget(self.signal_button_1, 0, 0, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_1, 0, 1, 1, 1)
         self.signal_button_2 = QPushButton('{}'.format(2), self)
         self.configure_signal_button(self.signal_button_2)
-        self.channels_enabled_layout.addWidget(self.signal_button_2, 0, 1, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_2, 0, 2, 1, 1)
         self.signal_button_3 = QPushButton('{}'.format(3), self)
         self.configure_signal_button(self.signal_button_3)
-        self.channels_enabled_layout.addWidget(self.signal_button_3, 0, 2, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_3, 0, 3, 1, 1)
         self.signal_button_4 = QPushButton('{}'.format(4), self)
         self.configure_signal_button(self.signal_button_4)
-        self.channels_enabled_layout.addWidget(self.signal_button_4, 0, 3, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_4, 0, 4, 1, 1)
         self.signal_button_5 = QPushButton('{}'.format(5), self)
         self.configure_signal_button(self.signal_button_5)
-        self.channels_enabled_layout.addWidget(self.signal_button_5, 0, 4, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_5, 0, 5, 1, 1)
         self.signal_button_6 = QPushButton('{}'.format(6), self)
         self.configure_signal_button(self.signal_button_6)
-        self.channels_enabled_layout.addWidget(self.signal_button_6, 0, 5, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_6, 0, 6, 1, 1)
+
         self.signal_button_7 = QPushButton('{}'.format(7), self)
         self.configure_signal_button(self.signal_button_7)
-        self.channels_enabled_layout.addWidget(self.signal_button_7, 0, 6, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_7, 1, 0, 1, 1)
         self.signal_button_8 = QPushButton('{}'.format(8), self)
         self.configure_signal_button(self.signal_button_8)
-        self.channels_enabled_layout.addWidget(self.signal_button_8, 0, 7, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_8, 1, 1, 1, 1)
         self.signal_button_9 = QPushButton('{}'.format(9), self)
         self.configure_signal_button(self.signal_button_9)
-        self.channels_enabled_layout.addWidget(self.signal_button_9, 0, 8, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_9, 1, 2, 1, 1)
         self.signal_button_10 = QPushButton('{}'.format(10), self)
         self.configure_signal_button(self.signal_button_10)
-        self.channels_enabled_layout.addWidget(self.signal_button_10, 0, 9, 1, 1)
-
+        self.channels_enabled_layout.addWidget(self.signal_button_10, 1, 3, 1, 1)
         self.signal_button_11 = QPushButton('{}'.format(11), self)
         self.configure_signal_button(self.signal_button_11)
-        self.channels_enabled_layout.addWidget(self.signal_button_11, 1, 0, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_11, 1, 4, 1, 1)
         self.signal_button_12 = QPushButton('{}'.format(12), self)
         self.configure_signal_button(self.signal_button_12)
-        self.channels_enabled_layout.addWidget(self.signal_button_12, 1, 1, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_12, 1, 5, 1, 1)
         self.signal_button_13 = QPushButton('{}'.format(13), self)
         self.configure_signal_button(self.signal_button_13)
-        self.channels_enabled_layout.addWidget(self.signal_button_13, 1, 2, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_13, 1, 6, 1, 1)
         self.signal_button_14 = QPushButton('{}'.format(14), self)
         self.configure_signal_button(self.signal_button_14)
-        self.channels_enabled_layout.addWidget(self.signal_button_14, 1, 3, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_14, 1, 7, 1, 1)
         self.signal_button_15 = QPushButton('{}'.format(15), self)
         self.configure_signal_button(self.signal_button_15)
-        self.channels_enabled_layout.addWidget(self.signal_button_15, 1, 4, 1, 1)
+
+        self.channels_enabled_layout.addWidget(self.signal_button_15, 2, 0, 1, 1)
         self.signal_button_16 = QPushButton('{}'.format(16), self)
         self.configure_signal_button(self.signal_button_16)
-        self.channels_enabled_layout.addWidget(self.signal_button_16, 1, 5, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_16, 2, 1, 1, 1)
         self.signal_button_17 = QPushButton('{}'.format(17), self)
         self.configure_signal_button(self.signal_button_17)
-        self.channels_enabled_layout.addWidget(self.signal_button_17, 1, 6, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_17, 2, 2, 1, 1)
         self.signal_button_18 = QPushButton('{}'.format(18), self)
         self.configure_signal_button(self.signal_button_18)
-        self.channels_enabled_layout.addWidget(self.signal_button_18, 1, 7, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_18, 2, 3, 1, 1)
         self.signal_button_19 = QPushButton('{}'.format(19), self)
         self.configure_signal_button(self.signal_button_19)
-        self.channels_enabled_layout.addWidget(self.signal_button_19, 1, 8, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_19, 2, 4, 1, 1)
         self.signal_button_20 = QPushButton('{}'.format(20), self)
         self.configure_signal_button(self.signal_button_20)
-        self.channels_enabled_layout.addWidget(self.signal_button_20, 1, 9, 1, 1)
-
+        self.channels_enabled_layout.addWidget(self.signal_button_20, 2, 5, 1, 1)
         self.signal_button_21 = QPushButton('{}'.format(21), self)
         self.configure_signal_button(self.signal_button_21)
-        self.channels_enabled_layout.addWidget(self.signal_button_21, 2, 0, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_21, 2, 6, 1, 1)
         self.signal_button_22 = QPushButton('{}'.format(22), self)
         self.configure_signal_button(self.signal_button_22)
-        self.channels_enabled_layout.addWidget(self.signal_button_22, 2, 1, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_22, 2, 7, 1, 1)
         self.signal_button_23 = QPushButton('{}'.format(23), self)
         self.configure_signal_button(self.signal_button_23)
-        self.channels_enabled_layout.addWidget(self.signal_button_23, 2, 2, 1, 1)
+
+        self.channels_enabled_layout.addWidget(self.signal_button_23, 3, 0, 1, 1)
         self.signal_button_24 = QPushButton('{}'.format(24), self)
         self.configure_signal_button(self.signal_button_24)
-        self.channels_enabled_layout.addWidget(self.signal_button_24, 2, 3, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_24, 3, 1, 1, 1)
         self.signal_button_25 = QPushButton('{}'.format(25), self)
         self.configure_signal_button(self.signal_button_25)
-        self.channels_enabled_layout.addWidget(self.signal_button_25, 2, 4, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_25, 3, 2, 1, 1)
         self.signal_button_26 = QPushButton('{}'.format(26), self)
         self.configure_signal_button(self.signal_button_26)
-        self.channels_enabled_layout.addWidget(self.signal_button_26, 2, 5, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_26, 3, 3, 1, 1)
         self.signal_button_27 = QPushButton('{}'.format(27), self)
         self.configure_signal_button(self.signal_button_27)
-        self.channels_enabled_layout.addWidget(self.signal_button_27, 2, 6, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_27, 3, 4, 1, 1)
         self.signal_button_28 = QPushButton('{}'.format(28), self)
         self.configure_signal_button(self.signal_button_28)
-        self.channels_enabled_layout.addWidget(self.signal_button_28, 2, 7, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_28, 3, 5, 1, 1)
         self.signal_button_29 = QPushButton('{}'.format(29), self)
         self.configure_signal_button(self.signal_button_29)
-        self.channels_enabled_layout.addWidget(self.signal_button_29, 2, 8, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_29, 3, 6, 1, 1)
         self.signal_button_30 = QPushButton('{}'.format(30), self)
         self.configure_signal_button(self.signal_button_30)
-        self.channels_enabled_layout.addWidget(self.signal_button_30, 2, 9, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_30, 3, 7, 1, 1)
 
         self.signal_button_31 = QPushButton('{}'.format(31), self)
         self.configure_signal_button(self.signal_button_31)
-        self.channels_enabled_layout.addWidget(self.signal_button_31, 3, 0, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_31, 4, 0, 1, 1)
         self.signal_button_32 = QPushButton('{}'.format(32), self)
         self.configure_signal_button(self.signal_button_32)
-        self.channels_enabled_layout.addWidget(self.signal_button_32, 3, 1, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_32, 4, 1, 1, 1)
         self.signal_button_33 = QPushButton('{}'.format(33), self)
         self.configure_signal_button(self.signal_button_33)
-        self.channels_enabled_layout.addWidget(self.signal_button_33, 3, 2, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_33, 4, 2, 1, 1)
         self.signal_button_34 = QPushButton('{}'.format(34), self)
         self.configure_signal_button(self.signal_button_34)
-        self.channels_enabled_layout.addWidget(self.signal_button_34, 3, 3, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_34, 4, 3, 1, 1)
         self.signal_button_35 = QPushButton('{}'.format(35), self)
         self.configure_signal_button(self.signal_button_35)
-        self.channels_enabled_layout.addWidget(self.signal_button_35, 3, 4, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_35, 4, 4, 1, 1)
         self.signal_button_36 = QPushButton('{}'.format(36), self)
         self.configure_signal_button(self.signal_button_36)
-        self.channels_enabled_layout.addWidget(self.signal_button_36, 3, 5, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_36, 4, 5, 1, 1)
         self.signal_button_37 = QPushButton('{}'.format(37), self)
         self.configure_signal_button(self.signal_button_37)
-        self.channels_enabled_layout.addWidget(self.signal_button_37, 3, 6, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_37, 4, 6, 1, 1)
         self.signal_button_38 = QPushButton('{}'.format(38), self)
         self.configure_signal_button(self.signal_button_38)
-        self.channels_enabled_layout.addWidget(self.signal_button_38, 3, 7, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_38, 4, 7, 1, 1)
+
         self.signal_button_39 = QPushButton('{}'.format(39), self)
         self.configure_signal_button(self.signal_button_39)
-        self.channels_enabled_layout.addWidget(self.signal_button_39, 3, 8, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_39, 5, 0, 1, 1)
         self.signal_button_40 = QPushButton('{}'.format(40), self)
         self.configure_signal_button(self.signal_button_40)
-        self.channels_enabled_layout.addWidget(self.signal_button_40, 3, 9, 1, 1)
-
+        self.channels_enabled_layout.addWidget(self.signal_button_40, 5, 1, 1, 1)
         self.signal_button_41 = QPushButton('{}'.format(41), self)
         self.configure_signal_button(self.signal_button_41)
-        self.channels_enabled_layout.addWidget(self.signal_button_41, 4, 0, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_41, 5, 2, 1, 1)
         self.signal_button_42 = QPushButton('{}'.format(42), self)
         self.configure_signal_button(self.signal_button_42)
-        self.channels_enabled_layout.addWidget(self.signal_button_42, 4, 1, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_42, 5, 3, 1, 1)
         self.signal_button_43 = QPushButton('{}'.format(43), self)
         self.configure_signal_button(self.signal_button_43)
-        self.channels_enabled_layout.addWidget(self.signal_button_43, 4, 2, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_43, 5, 4, 1, 1)
         self.signal_button_44 = QPushButton('{}'.format(44), self)
         self.configure_signal_button(self.signal_button_44)
-        self.channels_enabled_layout.addWidget(self.signal_button_44, 4, 3, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_44, 5, 5, 1, 1)
         self.signal_button_45 = QPushButton('{}'.format(45), self)
         self.configure_signal_button(self.signal_button_45)
-        self.channels_enabled_layout.addWidget(self.signal_button_45, 4, 4, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_45, 5, 6, 1, 1)
         self.signal_button_46 = QPushButton('{}'.format(46), self)
         self.configure_signal_button(self.signal_button_46)
-        self.channels_enabled_layout.addWidget(self.signal_button_46, 4, 5, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_46, 5, 7, 1, 1)
+
         self.signal_button_47 = QPushButton('{}'.format(47), self)
         self.configure_signal_button(self.signal_button_47)
-        self.channels_enabled_layout.addWidget(self.signal_button_47, 4, 6, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_47, 6, 0, 1, 1)
         self.signal_button_48 = QPushButton('{}'.format(48), self)
         self.configure_signal_button(self.signal_button_48)
-        self.channels_enabled_layout.addWidget(self.signal_button_48, 4, 7, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_48, 6, 1, 1, 1)
         self.signal_button_49 = QPushButton('{}'.format(49), self)
         self.configure_signal_button(self.signal_button_49)
-        self.channels_enabled_layout.addWidget(self.signal_button_49, 4, 8, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_49, 6, 2, 1, 1)
         self.signal_button_50 = QPushButton('{}'.format(50), self)
         self.configure_signal_button(self.signal_button_50)
-        self.channels_enabled_layout.addWidget(self.signal_button_50, 4, 9, 1, 1)
-
+        self.channels_enabled_layout.addWidget(self.signal_button_50, 6, 3, 1, 1)
         self.signal_button_51 = QPushButton('{}'.format(51), self)
         self.configure_signal_button(self.signal_button_51)
-        self.channels_enabled_layout.addWidget(self.signal_button_51, 5, 0, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_51, 6, 4, 1, 1)
         self.signal_button_52 = QPushButton('{}'.format(52), self)
         self.configure_signal_button(self.signal_button_52)
-        self.channels_enabled_layout.addWidget(self.signal_button_52, 5, 1, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_52, 6, 5, 1, 1)
         self.signal_button_53 = QPushButton('{}'.format(53), self)
         self.configure_signal_button(self.signal_button_53)
-        self.channels_enabled_layout.addWidget(self.signal_button_53, 5, 2, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_53, 6, 6, 1, 1)
         self.signal_button_54 = QPushButton('{}'.format(54), self)
         self.configure_signal_button(self.signal_button_54)
-        self.channels_enabled_layout.addWidget(self.signal_button_54, 5, 3, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_54, 6, 7, 1, 1)
+
         self.signal_button_55 = QPushButton('{}'.format(55), self)
         self.configure_signal_button(self.signal_button_55)
-        self.channels_enabled_layout.addWidget(self.signal_button_55, 5, 4, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_55, 7, 1, 1, 1)
         self.signal_button_56 = QPushButton('{}'.format(56), self)
         self.configure_signal_button(self.signal_button_56)
-        self.channels_enabled_layout.addWidget(self.signal_button_56, 5, 5, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_56, 7, 2, 1, 1)
         self.signal_button_57 = QPushButton('{}'.format(57), self)
         self.configure_signal_button(self.signal_button_57)
-        self.channels_enabled_layout.addWidget(self.signal_button_57, 5, 6, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_57, 7, 3, 1, 1)
         self.signal_button_58 = QPushButton('{}'.format(58), self)
         self.configure_signal_button(self.signal_button_58)
-        self.channels_enabled_layout.addWidget(self.signal_button_58, 5, 7, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_58, 7, 4, 1, 1)
         self.signal_button_59 = QPushButton('{}'.format(59), self)
         self.configure_signal_button(self.signal_button_59)
-        self.channels_enabled_layout.addWidget(self.signal_button_59, 5, 8, 1, 1)
+        self.channels_enabled_layout.addWidget(self.signal_button_59, 7, 5, 1, 1)
         self.signal_button_60 = QPushButton('{}'.format(60), self)
         self.configure_signal_button(self.signal_button_60)
-        self.channels_enabled_layout.addWidget(self.signal_button_60, 5, 9, 1, 1)
-
-    def create_main_bottom_layout(self):
-        self.main_tab_bottom_groupbox = QGroupBox(self.main_tab)
-        main_tab_bottom_size_policy = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Expanding)
-        main_tab_bottom_size_policy.setHorizontalStretch(0)
-        main_tab_bottom_size_policy.setVerticalStretch(1)
-        policy_flag = self.main_tab_bottom_groupbox.sizePolicy().hasHeightForWidth()
-        main_tab_bottom_size_policy.setHeightForWidth(policy_flag)
-        self.main_tab_bottom_groupbox.setSizePolicy(main_tab_bottom_size_policy)
-
-        self.main_tab_bottom_groupbox.setFont(self.gbox_font)
-        self.log_groupbox_layout = QVBoxLayout(self.main_tab_bottom_groupbox)
-
-        self.logger = logging.getLogger('log')
-        self.log_handler = ThreadLogger()
-        self.log_handler.setFormatter(
-            logging.Formatter('%(asctime)s - %(message)s', "%Y-%m-%d %H:%M:%S"))
-        self.logger.addHandler(self.log_handler)
-        self.logger.setLevel(logging.INFO)
-
-        self.log_window = QPlainTextEdit(self.main_tab_bottom_groupbox)
-        self.log_window.setReadOnly(True)
-        size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
-        size_policy.setHorizontalStretch(0)
-        size_policy.setVerticalStretch(0)
-        size_policy_flag = self.log_window.sizePolicy().hasHeightForWidth()
-        size_policy.setHeightForWidth(size_policy_flag)
-        self.log_window.setSizePolicy(size_policy)
-        self.log_groupbox_layout.addWidget(self.log_window)
-
-        self.log_handler.log.signal.connect(self.write_log)
-
-        self.progressBar = QProgressBar(self.main_tab_bottom_groupbox)
-        self.progressBar.setValue(100)
-        self.log_groupbox_layout.addWidget(self.progressBar)
-
-        self.main_tab_upper_layout.addWidget(self.main_tab_bottom_groupbox)
+        self.channels_enabled_layout.addWidget(self.signal_button_60, 7, 6, 1, 1)
 
     @Slot(str)
     def write_log(self, log_text):
@@ -1140,6 +1236,161 @@ class MEAXtd(QMainWindow):
         self.char_time_label = QLabel(text="Time characteristics")
         self.char_time_label.setFont(self.gbox_font)
         self.char_tab_layout.addWidget(self.char_time_label, 0, 4, 1, 1)
+
+    def create_graph_layout(self):
+        self.graph_info_panel = QWidget(self.graph_tab)
+        size_policy_graph_left = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        size_policy_graph_left.setHorizontalStretch(1)
+        size_policy_graph_left.setVerticalStretch(0)
+        size_policy_graph_left_flag = self.graph_info_panel.sizePolicy().hasHeightForWidth()
+        size_policy_graph_left.setHeightForWidth(size_policy_graph_left_flag)
+        self.graph_info_panel.setSizePolicy(size_policy_graph_left)
+        self.graph_info_panel_layout = QGridLayout(self.graph_info_panel)
+
+        self.graph_table = QTableWidget(self.graph_info_panel)
+        self.graph_info_panel_layout.addWidget(self.graph_table, 0, 0, 1, 1)
+        self.graph_table.verticalHeader().setVisible(False)
+
+        self.graph_params_panel = QWidget(self.graph_info_panel)
+        self.graph_params_panel_layout = QVBoxLayout(self.graph_params_panel)
+
+        self.graph_params_groupbox = QGroupBox(self.graph_params_panel, title="Graph Parameters")
+        size_policy_graph_params = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        size_policy_graph_params.setHorizontalStretch(0)
+        size_policy_graph_params.setVerticalStretch(2)
+        size_policy_graph_params_flag = self.graph_params_groupbox.sizePolicy().hasHeightForWidth()
+        size_policy_graph_params.setHeightForWidth(size_policy_graph_params_flag)
+        self.graph_params_groupbox.setSizePolicy(size_policy_graph_params)
+        self.graph_params_groupbox.setFont(self.gbox_font)
+        self.graph_params_groupbox_layout = QGridLayout(self.graph_params_groupbox)
+
+        self.graph_delta_param_label = QLabel(self.graph_params_groupbox, text="Delta, ms")
+        self.graph_params_groupbox_layout.addWidget(self.graph_delta_param_label, 0, 0, 1, 1)
+        self.graph_delta_param_label.setToolTip("Size of delayed spike detection step")
+        self.graph_delta_param_label.setToolTipDuration(1000)
+
+        self.graph_params_delta_spinbox = QDoubleSpinBox(self.graph_params_groupbox)
+        self.graph_params_delta_spinbox.setMinimum(0)
+        self.graph_params_delta_spinbox.setMaximum(10)
+        self.graph_params_delta_spinbox.setValue(0.05)
+        self.graph_params_delta_spinbox.valueChanged.connect(self.delta_spinbox_change)
+        self.graph_params_groupbox_layout.addWidget(self.graph_params_delta_spinbox, 0, 1, 1, 1)
+
+        self.graph_tau_param_label = QLabel(self.graph_params_groupbox, text="Num frames")
+        self.graph_params_groupbox_layout.addWidget(self.graph_tau_param_label, 1, 0, 1, 1)
+        self.graph_tau_param_label.setToolTip("Maximum correlation time-shift in frames")
+        self.graph_tau_param_label.setToolTipDuration(1000)
+
+        self.graph_params_tau_spinbox = QSpinBox(self.graph_params_groupbox)
+        self.graph_params_tau_spinbox.setMinimum(0)
+        self.graph_params_tau_spinbox.setMaximum(1000)
+        self.graph_params_tau_spinbox.setValue(50)
+        self.graph_params_tau_spinbox.valueChanged.connect(self.tau_spinbox_change)
+        self.graph_params_groupbox_layout.addWidget(self.graph_params_tau_spinbox, 1, 1, 1, 1)
+
+        self.graph_cutoff_param_label = QLabel(self.graph_params_groupbox, text="Cutoff top, %")
+        self.graph_params_groupbox_layout.addWidget(self.graph_cutoff_param_label, 2, 0, 1, 1)
+        self.graph_cutoff_param_label.setToolTip("Choose top % of C_ij")
+        self.graph_cutoff_param_label.setToolTipDuration(1000)
+
+        self.graph_params_cutoff_spinbox = QSpinBox(self.graph_params_groupbox)
+        self.graph_params_cutoff_spinbox.setMinimum(0)
+        self.graph_params_cutoff_spinbox.setMaximum(100)
+        self.graph_params_cutoff_spinbox.setValue(5)
+        self.graph_params_cutoff_spinbox.valueChanged.connect(self.cutoff_spinbox_change)
+        self.graph_params_groupbox_layout.addWidget(self.graph_params_cutoff_spinbox, 2, 1, 1, 1)
+
+        self.graph_params_panel_layout.addWidget(self.graph_params_groupbox)
+
+        self.graph_navigation_groupbox = QGroupBox(self.graph_params_panel, title="Navigation")
+        size_policy_graph_navigation = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        size_policy_graph_navigation.setHorizontalStretch(0)
+        size_policy_graph_navigation.setVerticalStretch(1)
+        size_policy_graph_navigation_flag = self.graph_navigation_groupbox.sizePolicy().hasHeightForWidth()
+        size_policy_graph_navigation.setHeightForWidth(size_policy_graph_navigation_flag)
+        self.graph_navigation_groupbox.setSizePolicy(size_policy_graph_navigation)
+        self.graph_navigation_groupbox.setFont(self.gbox_font)
+        self.graph_navigation_groupbox_layout = QGridLayout(self.graph_navigation_groupbox)
+        self.graph_navigation_groupbox_layout.setContentsMargins(50, 20, 50, 20)
+        self.graph_navigation_groupbox_layout.setSpacing(40)
+
+        self.burst_id_label = QLabel(self.graph_navigation_groupbox, text="Burst")
+        self.graph_navigation_groupbox_layout.addWidget(self.burst_id_label, 0, 0, 1, 1)
+
+        self.burst_id_spinbox = QSpinBox(self.graph_navigation_groupbox)
+        self.burst_id_spinbox.setValue(1)
+        self.burst_id_spinbox.valueChanged.connect(self.burst_id_spinbox_change)
+        self.graph_navigation_groupbox_layout.addWidget(self.burst_id_spinbox, 0, 1, 1, 1)
+
+        self.build_graph_btn = QPushButton(self.graph_navigation_groupbox, text="Build Graph")
+        size_policy_build_graph_btn = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+        size_policy_build_graph_btn.setHorizontalStretch(0)
+        size_policy_build_graph_btn.setVerticalStretch(0)
+        size_policy_build_graph_btn_flag = self.build_graph_btn.sizePolicy().hasHeightForWidth()
+        size_policy_build_graph_btn.setHeightForWidth(size_policy_build_graph_btn_flag)
+        self.build_graph_btn.setSizePolicy(size_policy_build_graph_btn)
+        self.build_graph_btn.setDisabled(True)
+        self.build_graph_btn.clicked.connect(lambda: self.process_graph())
+
+        self.graph_navigation_groupbox_layout.addWidget(self.build_graph_btn, 1, 0, 1, 2)
+
+        self.graph_info_panel_layout.addWidget(self.graph_params_panel, 0, 1, 1, 1)
+
+        self.graph_params_panel_layout.addWidget(self.graph_navigation_groupbox)
+        self.graph_tab_layout.addWidget(self.graph_info_panel)
+
+        self.graph_picture_panel = QWidget(self.graph_tab)
+        size_policy_graph_right = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        size_policy_graph_right.setHorizontalStretch(1)
+        size_policy_graph_right.setVerticalStretch(0)
+        size_policy_graph_right_flag = self.graph_picture_panel.sizePolicy().hasHeightForWidth()
+        size_policy_graph_right.setHeightForWidth(size_policy_graph_right_flag)
+        self.graph_picture_panel.setSizePolicy(size_policy_graph_right)
+        self.graph_picture_panel_layout = QVBoxLayout(self.graph_picture_panel)
+
+        self.graph_picture = QLabel(self.graph_picture_panel)
+        self.graph_picture_panel_layout.addWidget(self.graph_picture, alignment=Qt.AlignCenter)
+
+        self.graph_tab_layout.addWidget(self.graph_picture_panel)
+
+    def create_logging_layout(self):
+        self.main_logging_groupbox = QGroupBox(self.central_widget)
+        main_logging_size_policy = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Expanding)
+        main_logging_size_policy.setHorizontalStretch(0)
+        main_logging_size_policy.setVerticalStretch(1)
+        policy_flag = self.main_logging_groupbox.sizePolicy().hasHeightForWidth()
+        main_logging_size_policy.setHeightForWidth(policy_flag)
+        self.main_logging_groupbox.setSizePolicy(main_logging_size_policy)
+
+        self.logger_font = QFont()
+        self.logger_font.setPointSize(14)
+
+        self.main_logging_groupbox.setFont(self.logger_font)
+        self.log_groupbox_layout = QHBoxLayout(self.main_logging_groupbox)
+
+        self.progressBar = QProgressBar(self.main_logging_groupbox)
+        self.progressBar.setValue(100)
+        self.log_groupbox_layout.addWidget(self.progressBar)
+
+        self.logger = logging.getLogger('log')
+        self.log_handler = ThreadLogger()
+        self.log_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s', "%Y-%m-%d %H:%M:%S"))
+        self.logger.addHandler(self.log_handler)
+        self.logger.setLevel(logging.INFO)
+
+        self.log_window = QPlainTextEdit(self.main_logging_groupbox)
+        self.log_window.setReadOnly(True)
+        size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        size_policy.setHorizontalStretch(0)
+        size_policy.setVerticalStretch(0)
+        size_policy_flag = self.log_window.sizePolicy().hasHeightForWidth()
+        size_policy.setHeightForWidth(size_policy_flag)
+        self.log_window.setSizePolicy(size_policy)
+        self.log_groupbox_layout.addWidget(self.log_window)
+
+        self.log_handler.log.signal.connect(self.write_log)
+
+        self.main_layout.addWidget(self.main_logging_groupbox)
 
 
 class AboutDialog(QDialog):
@@ -1529,6 +1780,7 @@ class StatDialog(QDialog):
 
 def main(args=sys.argv):
     application = QApplication(args)
+    application.setStyle(QStyleFactory.create('Fusion'))
     screen = application.primaryScreen()
     rect = screen.availableGeometry()
     window = MEAXtd(rect)
