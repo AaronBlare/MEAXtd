@@ -115,7 +115,7 @@ class MEAXtd(QMainWindow):
 
         self.menu_bar = self.menuBar()
         self.about_dialog = AboutDialog()
-        self.status_bar = self.statusBar()
+        # self.status_bar = self.statusBar()
         # self.status_bar.showMessage('Ready')
         self.file_menu()
         self.help_menu()
@@ -133,7 +133,7 @@ class MEAXtd(QMainWindow):
         self.tabs = QTabWidget(self.central_widget)
         tab_size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         tab_size_policy.setHorizontalStretch(0)
-        tab_size_policy.setVerticalStretch(10)
+        tab_size_policy.setVerticalStretch(15)
         tab_size_policy_flag = self.tabs.sizePolicy().hasHeightForWidth()
         tab_size_policy.setHeightForWidth(tab_size_policy_flag)
         self.tabs.setSizePolicy(tab_size_policy)
@@ -1354,7 +1354,7 @@ class MEAXtd(QMainWindow):
 
     def create_logging_layout(self):
         self.main_logging_groupbox = QGroupBox(self.central_widget)
-        main_logging_size_policy = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Expanding)
+        main_logging_size_policy = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Ignored)
         main_logging_size_policy.setHorizontalStretch(0)
         main_logging_size_policy.setVerticalStretch(1)
         policy_flag = self.main_logging_groupbox.sizePolicy().hasHeightForWidth()
@@ -1362,7 +1362,7 @@ class MEAXtd(QMainWindow):
         self.main_logging_groupbox.setSizePolicy(main_logging_size_policy)
 
         self.logger_font = QFont()
-        self.logger_font.setPointSize(14)
+        self.logger_font.setPointSize(10)
 
         self.main_logging_groupbox.setFont(self.logger_font)
         self.log_groupbox_layout = QHBoxLayout(self.main_logging_groupbox)
@@ -1381,7 +1381,7 @@ class MEAXtd(QMainWindow):
         self.log_window.setReadOnly(True)
         size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         size_policy.setHorizontalStretch(0)
-        size_policy.setVerticalStretch(0)
+        size_policy.setVerticalStretch(1)
         size_policy_flag = self.log_window.sizePolicy().hasHeightForWidth()
         size_policy.setHeightForWidth(size_policy_flag)
         self.log_window.setSizePolicy(size_policy)
