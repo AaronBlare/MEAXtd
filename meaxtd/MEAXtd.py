@@ -1,4 +1,5 @@
 import sys
+import re
 import traceback
 import pyqtgraph as pg
 import numpy as np
@@ -95,6 +96,14 @@ class ThreadLogger(logging.Handler):
     def emit(self, record):
         msg = self.format(record)
         self.log.signal.emit(msg)
+
+
+class TableWidgetItem(QTableWidgetItem):
+    def __lt__(self, other):
+        try:
+            return float(self.text()) < float(other.text())
+        except ValueError:
+            return self.text() < other.text()
 
 
 class MEAXtd(QMainWindow):
@@ -649,8 +658,13 @@ class MEAXtd(QMainWindow):
             self.logger.info("Characteristics calculated.")
             self.char_global_table.setRowCount(len(list(self.data.global_characteristics.keys())))
             for n, key in enumerate(self.data.global_characteristics):
-                self.char_global_table.setItem(n, 0, QTableWidgetItem(key))
-                self.char_global_table.setItem(n, 1, QTableWidgetItem(str(self.data.global_characteristics[key])))
+                curr_tab_item_0 = TableWidgetItem()
+                curr_tab_item_0.setData(Qt.EditRole, key)
+                self.char_global_table.setItem(n, 0, curr_tab_item_0)
+
+                curr_item = self.data.global_characteristics[key]
+                curr_tab_item_1 = TableWidgetItem(str(curr_item))
+                self.char_global_table.setItem(n, 1, curr_tab_item_1)
 
         if self.data.channel_characteristics:
             headers = list(self.data.channel_characteristics.keys())
@@ -660,8 +674,18 @@ class MEAXtd(QMainWindow):
             for signal_id in range(0, self.data.stream.shape[1]):
                 if signal_id not in self.excluded_channels:
                     for n, key in enumerate(self.data.channel_characteristics):
-                        self.char_channel_table.setItem(signal_id - signal_shift, n, QTableWidgetItem(
-                            str(self.data.channel_characteristics[key][signal_id])))
+                        curr_item = self.data.channel_characteristics[key][signal_id]
+                        if isinstance(self.data.channel_characteristics[key][signal_id], float):
+                            curr_item = round(self.data.channel_characteristics[key][signal_id], 4)
+                            curr_tab_item = TableWidgetItem(str(curr_item))
+                            self.char_channel_table.setItem(signal_id - signal_shift, n, curr_tab_item)
+                        elif isinstance(self.data.channel_characteristics[key][signal_id], np.int32):
+                            curr_tab_item = TableWidgetItem(str(curr_item))
+                            self.char_channel_table.setItem(signal_id - signal_shift, n, curr_tab_item)
+                        else:
+                            curr_tab_item = TableWidgetItem()
+                            curr_tab_item.setData(Qt.EditRole, curr_item)
+                            self.char_channel_table.setItem(signal_id - signal_shift, n, curr_tab_item)
                 else:
                     signal_shift += 1
             self.char_channel_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
@@ -678,13 +702,33 @@ class MEAXtd(QMainWindow):
 
             for burst_id in range(0, len(self.data.bursts)):
                 for n, key in enumerate(self.data.burst_characteristics):
-                    self.char_burst_table.setItem(burst_id, n, QTableWidgetItem(
-                        str(self.data.burst_characteristics[key][burst_id])))
-
                     curr_item = self.data.burst_characteristics[key][burst_id]
                     if isinstance(self.data.burst_characteristics[key][burst_id], float):
                         curr_item = round(self.data.burst_characteristics[key][burst_id], 2)
-                    self.graph_table.setItem(burst_id, n, QTableWidgetItem(str(curr_item)))
+                        curr_tab_item = TableWidgetItem(str(curr_item))
+                        self.char_burst_table.setItem(burst_id, n, curr_tab_item)
+                    elif isinstance(self.data.burst_characteristics[key][burst_id], np.int32):
+                        curr_tab_item = TableWidgetItem(str(curr_item))
+                        self.char_burst_table.setItem(burst_id, n, curr_tab_item)
+                    else:
+                        curr_tab_item = TableWidgetItem()
+                        curr_tab_item.setData(Qt.EditRole, curr_item)
+                        self.char_burst_table.setItem(burst_id, n, curr_tab_item)
+
+            for burst_id in range(0, len(self.data.bursts)):
+                for n, key in enumerate(self.data.burst_characteristics):
+                    curr_item = self.data.burst_characteristics[key][burst_id]
+                    if isinstance(self.data.burst_characteristics[key][burst_id], float):
+                        curr_item = round(self.data.burst_characteristics[key][burst_id], 2)
+                        curr_tab_item = TableWidgetItem(str(curr_item))
+                        self.graph_table.setItem(burst_id, n, curr_tab_item)
+                    elif isinstance(self.data.burst_characteristics[key][burst_id], np.int32):
+                        curr_tab_item = TableWidgetItem(str(curr_item))
+                        self.graph_table.setItem(burst_id, n, curr_tab_item)
+                    else:
+                        curr_tab_item = TableWidgetItem()
+                        curr_tab_item.setData(Qt.EditRole, curr_item)
+                        self.graph_table.setItem(burst_id, n, curr_tab_item)
 
             self.char_burst_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
             self.graph_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
@@ -699,9 +743,29 @@ class MEAXtd(QMainWindow):
             self.char_time_table.setHorizontalHeaderLabels(headers)
             for minute_id in range(0, len(self.data.time_characteristics['Start'])):
                 for n, key in enumerate(self.data.time_characteristics):
-                    self.char_time_table.setItem(minute_id, n, QTableWidgetItem(
-                        str(self.data.time_characteristics[key][minute_id])))
+                    curr_item = self.data.time_characteristics[key][minute_id]
+                    if isinstance(self.data.time_characteristics[key][minute_id], float):
+                        curr_item = round(self.data.time_characteristics[key][minute_id], 2)
+                        curr_tab_item = TableWidgetItem(str(curr_item))
+                        self.char_time_table.setItem(minute_id, n, curr_tab_item)
+                    elif isinstance(self.data.time_characteristics[key][minute_id], np.int32):
+                        curr_tab_item = TableWidgetItem(str(curr_item))
+                        self.char_time_table.setItem(minute_id, n, curr_tab_item)
+                    else:
+                        curr_tab_item = TableWidgetItem()
+                        curr_tab_item.setData(Qt.EditRole, curr_item)
+                        self.char_time_table.setItem(minute_id, n, curr_tab_item)
             self.char_time_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        self.char_global_table.setSortingEnabled(True)
+        self.char_channel_table.setSortingEnabled(True)
+        self.char_channel_table.sortItems(0, Qt.AscendingOrder)
+        self.char_burst_table.setSortingEnabled(True)
+        self.char_burst_table.sortItems(0, Qt.AscendingOrder)
+        self.char_time_table.setSortingEnabled(True)
+        self.char_time_table.sortItems(0, Qt.AscendingOrder)
+        self.graph_table.setSortingEnabled(True)
+        self.graph_table.sortItems(0, Qt.AscendingOrder)
 
         self.path_to_save = save_tables_to_file(self.data, self.filename, progress_callback)
 
