@@ -195,6 +195,10 @@ class MEAXtd(QMainWindow):
         self.stat.remove_plots(self.stat_left_groupbox_layout, self.stat_right_groupbox_layout)
         self.create_char_layout()
 
+    @Slot()
+    def spinbox_change(self):
+        self.process_graph()
+
     def file_menu(self):
         """Create a file submenu with an Open File item that opens a file dialog."""
         self.file_sub_menu = self.menu_bar.addMenu('File')
@@ -234,6 +238,8 @@ class MEAXtd(QMainWindow):
         if self.data:
             self.logger.info(f"File loaded.")
             self.processqbtn.setEnabled(True)
+            self.processqbtn.setAutoDefault(True)
+            self.processqbtn.setFocus()
             self.plot.set_data(self.data, 0, int(np.ceil(self.data.time[-1] / 60)))
             self.stat.set_data(self.data, 0, int(np.ceil(self.data.time[-1] / 60)))
             self.plot.plot_signals(self.plot_grid)
@@ -706,6 +712,9 @@ class MEAXtd(QMainWindow):
 
         if self.data.bursts:
             self.build_graph_btn.setEnabled(True)
+            self.burst_id_spinbox.setEnabled(True)
+            self.curr_burst_id = None
+            # setKeyboardTracking(False)
 
     def save_characteristics(self):
         self.logger.info(f"Characteristics saved to {self.path_to_save}")
@@ -737,9 +746,13 @@ class MEAXtd(QMainWindow):
         cutoff = self.graph_params_cutoff_spinbox.value()
         burst_id = self.burst_id_spinbox.value() - 1
 
+        if burst_id == self.curr_burst_id:
+            return
+
         self.logger.info(f"Graph for burst {burst_id + 1} building...")
 
         construct_delayed_spikes_graph(self.data, progress_callback, burst_method, delta, num_frames, cutoff, burst_id)
+        self.curr_burst_id = burst_id
 
         self.logger.info(f"Graph for burst {burst_id + 1} built.")
 
@@ -1317,8 +1330,10 @@ class MEAXtd(QMainWindow):
         self.graph_navigation_groupbox_layout.addWidget(self.burst_id_label, 0, 0, 1, 1)
 
         self.burst_id_spinbox = QSpinBox(self.graph_navigation_groupbox)
+        self.burst_id_spinbox.setDisabled(True)
         self.burst_id_spinbox.setValue(1)
         self.burst_id_spinbox.valueChanged.connect(self.burst_id_spinbox_change)
+        self.burst_id_spinbox.editingFinished.connect(self.spinbox_change)
         self.graph_navigation_groupbox_layout.addWidget(self.burst_id_spinbox, 0, 1, 1, 1)
 
         self.build_graph_btn = QPushButton(self.graph_navigation_groupbox, text="Build Graph")
