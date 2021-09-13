@@ -119,7 +119,7 @@ class MEAXtd(QMainWindow):
 
         self.av_width = rect.width()
         self.av_height = rect.height()
-        self.setMaximumSize(self.av_width, self.av_height)
+        #self.setMaximumSize(self.av_width, self.av_height)
         self.resize(int(self.av_width * 0.9), int(self.av_height * 0.75))
 
         self.menu_bar = self.menuBar()

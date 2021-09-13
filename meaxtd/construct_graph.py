@@ -100,7 +100,7 @@ def construct_delayed_spikes_graph(data, progress_callback, burst_method, delta,
         frame_size = 1
     else:
         frame_size = int(delta // sampling_rate)
-    #num_frames = round((curr_burst_end - curr_burst_start + 1) / frame_size)
+    # num_frames = round((curr_burst_end - curr_burst_start + 1) / frame_size)
     tau_list = list(range(1, num_frames + 1)) * frame_size
 
     progress_callback.emit(10)
@@ -172,7 +172,10 @@ def construct_delayed_spikes_graph(data, progress_callback, burst_method, delta,
         nodes[f"Electrode {post_node + 1}"]['total'] += 1
         nodes[f"Electrode {post_node + 1}"]['post'] += 1
     for node in nodes:
-        graph.add_node(node, label=f"{node} [{nodes[node]['total']}]")
+        graph.add_node(node,
+                       label=f"{node} [{nodes[node]['total']}]",
+                       width=nodes[node]['total'] / 4,
+                       height=nodes[node]['total'] / 5)
     for edge_id in range(0, len(c_ij_top['Channel 1'])):
         cell_1 = f"Electrode {list(c_ij_top['Channel 1'])[edge_id] + 1}"
         cell_2 = f"Electrode {list(c_ij_top['Channel 2'])[edge_id] + 1}"
