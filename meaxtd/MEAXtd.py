@@ -662,7 +662,7 @@ class MEAXtd(QMainWindow):
                 curr_tab_item_0.setData(Qt.EditRole, key)
                 self.char_global_table.setItem(n, 0, curr_tab_item_0)
 
-                curr_item = self.data.global_characteristics[key]
+                curr_item = round(self.data.global_characteristics[key], 4)
                 curr_tab_item_1 = TableWidgetItem(str(curr_item))
                 self.char_global_table.setItem(n, 1, curr_tab_item_1)
 
@@ -1261,7 +1261,7 @@ class MEAXtd(QMainWindow):
         headers = ['Characteristic', 'Value']
         self.char_global_table.setColumnCount(2)
         self.char_global_table.setHorizontalHeaderLabels(headers)
-        self.char_global_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.char_global_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.char_global_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.char_global_table.verticalHeader().setVisible(False)
         self.char_tab_layout.addWidget(self.char_global_table, 1, 0, 1, 1)
