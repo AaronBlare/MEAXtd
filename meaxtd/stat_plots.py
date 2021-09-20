@@ -29,6 +29,14 @@ def tsr_plot(data):
     return curve
 
 
+def tsr_plot_threshold(data, thr):
+    curve = pg.PlotCurveItem()
+    x = data.TSR_times
+    y = np.zeros(x.shape) + thr
+    curve.setData(x=x, y=y, pen=pg.mkPen('r', width=2))
+    return curve
+
+
 def colormap_plot(data):
     data = np.insert(data, 0, None)
     data = np.insert(data, 7, None)

@@ -9,7 +9,7 @@ from meaxtd.hdf5plot import HDF5PlotXY
 from meaxtd.find_bursts import find_spikes, find_bursts, calculate_characteristics
 from meaxtd.construct_graph import construct_delayed_spikes_graph
 from meaxtd.save_result import save_tables_to_file, save_plots_to_file, save_params_to_file, save_graph_to_file
-from meaxtd.stat_plots import raster_plot, tsr_plot, colormap_plot
+from meaxtd.stat_plots import raster_plot, tsr_plot, tsr_plot_threshold, colormap_plot
 from PySide2.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal, QSize
 from PySide2.QtGui import QFont, QPixmap
 from PySide2.QtWidgets import (QApplication, QDialog, QFileDialog, QLayout, QFrame, QSizePolicy, QAction,
@@ -119,7 +119,7 @@ class MEAXtd(QMainWindow):
 
         self.av_width = rect.width()
         self.av_height = rect.height()
-        #self.setMaximumSize(self.av_width, self.av_height)
+        # self.setMaximumSize(self.av_width, self.av_height)
         self.resize(int(self.av_width * 0.9), int(self.av_height * 0.75))
 
         self.menu_bar = self.menuBar()
@@ -625,6 +625,10 @@ class MEAXtd(QMainWindow):
         find_bursts(self.data, self.excluded_channels, spike_method, spike_coeff, burst_method, burst_window,
                     burst_param, start, end, progress_callback)
 
+        self.TSR_threshold = np.mean(self.data.TSR) + burst_param * np.std(self.data.TSR)
+        self.stat.set_threshold(self.TSR_threshold)
+        self.stat.plot_tsr(self.stat_left_groupbox_layout)
+
         self.logger.info(f"TSR threshold: {np.mean(self.data.TSR) + burst_param * np.std(self.data.TSR)}")
         self.logger.info(f"TSR mean: {np.mean(self.data.TSR)}; TSR std: {np.std(self.data.TSR)}")
 
@@ -705,6 +709,8 @@ class MEAXtd(QMainWindow):
                     curr_item = self.data.burst_characteristics[key][burst_id]
                     if isinstance(self.data.burst_characteristics[key][burst_id], float):
                         curr_item = round(self.data.burst_characteristics[key][burst_id], 2)
+                        if curr_item == 0.0:
+                            curr_item = round(self.data.burst_characteristics[key][burst_id], 6)
                         curr_tab_item = TableWidgetItem(str(curr_item))
                         self.char_burst_table.setItem(burst_id, n, curr_tab_item)
                     elif isinstance(self.data.burst_characteristics[key][burst_id], np.int32):
@@ -720,6 +726,8 @@ class MEAXtd(QMainWindow):
                     curr_item = self.data.burst_characteristics[key][burst_id]
                     if isinstance(self.data.burst_characteristics[key][burst_id], float):
                         curr_item = round(self.data.burst_characteristics[key][burst_id], 2)
+                        if curr_item == 0.0:
+                            curr_item = round(self.data.burst_characteristics[key][burst_id], 6)
                         curr_tab_item = TableWidgetItem(str(curr_item))
                         self.graph_table.setItem(burst_id, n, curr_tab_item)
                     elif isinstance(self.data.burst_characteristics[key][burst_id], np.int32):
@@ -755,7 +763,7 @@ class MEAXtd(QMainWindow):
                         curr_tab_item = TableWidgetItem()
                         curr_tab_item.setData(Qt.EditRole, curr_item)
                         self.char_time_table.setItem(minute_id, n, curr_tab_item)
-            self.char_time_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            self.char_time_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
 
         self.char_global_table.setSortingEnabled(True)
         self.char_channel_table.setSortingEnabled(True)
@@ -1762,6 +1770,9 @@ class StatDialog(QDialog):
         self.start = start
         self.end = end
 
+    def set_threshold(self, thr):
+        self.TSR_threshold = thr
+
     def init_ui(self, left_layout, right_layout):
         self.configure_left(left_layout)
         self.configure_right(right_layout)
@@ -1821,11 +1832,14 @@ class StatDialog(QDialog):
     def plot_tsr(self, left_layout):
         tplot = tsr_plot(self.data)
         left_layout.layout().itemAtPosition(0, 0).widget().addItem(tplot)
-        left_layout.layout().itemAtPosition(0, 0).widget().setLimits(yMin=-3, yMax=max(self.data.TSR) + 1,
+        if hasattr(self, 'TSR_threshold'):
+            tplot_thr = tsr_plot_threshold(self.data, self.TSR_threshold)
+            left_layout.layout().itemAtPosition(0, 0).widget().addItem(tplot_thr)
+        left_layout.layout().itemAtPosition(0, 0).widget().setLimits(yMin=-0.1, yMax=max(self.data.TSR) + 1,
                                                                      xMin=0, xMax=self.data.time[-1])
         left_layout.layout().itemAtPosition(0, 0).widget().setYRange(-1, max(self.data.TSR) + 1)
         left_layout.layout().itemAtPosition(0, 0).widget().setXRange(0, self.data.time[-1])
-        left_layout.layout().itemAtPosition(0, 0).widget().getPlotItem().hideAxis('bottom')
+        # left_layout.layout().itemAtPosition(0, 0).widget().getPlotItem().hideAxis('bottom')
 
     def plot_colormap(self, right_layout):
         cm = pg.colormap.get('CET-R4')

@@ -189,7 +189,6 @@ def create_interval_tree(data):
 
 def find_bursts(data, excluded_channels, spike_method, spike_coeff, burst_method, burst_window, burst_param,
                 start, end, progress_callback):
-
     start_index = np.where(data.time == start * 60)[0][0]
     if end < int(np.ceil(data.time[-1] / 60)):
         end_index = np.where(data.time == end * 60)[0][0]
@@ -214,7 +213,7 @@ def find_bursts(data, excluded_channels, spike_method, spike_coeff, burst_method
                 curr_burstlet_start = data.burstlets_starts[signal_id][burstlet_id]
                 curr_burstlet_end = data.burstlets_ends[signal_id][burstlet_id]
                 burst_detection_function[curr_burstlet_start:curr_burstlet_end] += 1
-        threshold_crossings = np.diff(burst_detection_function > burst_num_channels, prepend=False)
+        threshold_crossings = np.diff(burst_detection_function > burst_param, prepend=False)
         threshold_crossings_ids = np.argwhere(threshold_crossings)[:, 0]
         interval_tree = create_interval_tree(data)
         for interval_id in range(0, len(threshold_crossings_ids) // 2):
@@ -298,6 +297,7 @@ def find_bursts(data, excluded_channels, spike_method, spike_coeff, burst_method
         burst_activation_vector[:] = np.nan
         burst_deactivation_vector = np.empty(shape=(len(data.bursts), num_signals))
         burst_deactivation_vector[:] = np.nan
+        burst_amplitudes = []
         for burst_id in range(0, len(data.bursts)):
             curr_burst = data.bursts[burst_id]
             activation_time = curr_burst['start']
@@ -311,6 +311,15 @@ def find_bursts(data, excluded_channels, spike_method, spike_coeff, burst_method
                 last_spike_time = data.spikes[signal_id][last_spike_id - 1]
                 curr_deactivation_time = data.time[deactivation_time] - data.time[last_spike_time]
                 burst_deactivation_vector[burst_id, signal_id] = curr_deactivation_time
+                last_id = last_spike_id + 1
+                if last_id >= len(data.spikes_amplitudes[signal_id]):
+                    last_id -= 1
+                for spike_id in range(first_spike_id, last_id):
+                    burst_amplitudes.append(data.spikes_amplitudes[signal_id][spike_id])
+            data.bursts[burst_id]['max amplitude'] = np.max(burst_amplitudes)
+            data.bursts[burst_id]['mean amplitude'] = np.mean(burst_amplitudes)
+            data.bursts[burst_id]['std amplitude'] = np.std(burst_amplitudes)
+            data.bursts[burst_id]['median amplitude'] = np.median(burst_amplitudes)
 
     data.burst_activation = np.zeros(num_signals)
     data.burst_deactivation = np.zeros(num_signals)
@@ -390,6 +399,7 @@ def calculate_characteristics(data, start, end, progress_callback):
     time_bin = 50
     mean_num_spikes_time_bin = np.mean(data.TSR)
     std_num_spikes_time_bin = np.std(data.TSR)
+    mean_burst_activation = np.mean(data.burst_activation)
 
     data.global_characteristics['Total number of spikes'] = total_num_spikes
     data.global_characteristics['Num spikes per second'] = num_spikes_per_second
@@ -403,6 +413,7 @@ def calculate_characteristics(data, start, end, progress_callback):
     data.global_characteristics['Time bin in ms'] = time_bin
     data.global_characteristics['Mean number of spikes in time bin'] = mean_num_spikes_time_bin
     data.global_characteristics['Std number of spikes in time bin'] = std_num_spikes_time_bin
+    data.global_characteristics['Mean burst activation'] = mean_burst_activation
 
     progress_callback.emit(82)
 
@@ -411,15 +422,18 @@ def calculate_characteristics(data, start, end, progress_callback):
         num_spikes.append(len(data.spikes[signal_id]))
     firing_rate = []
     firing_rate_ms = []
+    firing_rate_bin = []
     for signal_id in range(0, num_signals):
         firing_rate.append(num_spikes[signal_id] / num_seconds)
         firing_rate_ms.append(num_spikes[signal_id] / (num_seconds * 1000))
+        firing_rate_bin.append(num_spikes[signal_id] / (num_seconds * 1000 / 50))
 
     data.channel_characteristics['Channel'] = [i + 1 for i in range(0, num_signals)]
     data.channel_characteristics['Number of spikes'] = num_spikes
     data.channel_characteristics['Num spikes per second'] = firing_rate
-    data.channel_characteristics['Num spikes per ms'] = firing_rate_ms
     data.channel_characteristics['Burst activation mean'] = data.burst_activation
+    data.channel_characteristics['Num spikes per ms'] = firing_rate_ms
+    data.channel_characteristics['Num spikes per 50 ms bin'] = firing_rate_bin
 
     progress_callback.emit(85)
 
@@ -469,6 +483,34 @@ def calculate_characteristics(data, start, end, progress_callback):
     for burst_id in range(0, len(bursts_starts)):
         bursts_duration.append(bursts_ends[burst_id] - bursts_starts[burst_id])
 
+    bursts_amps_max = []
+    bursts_amps_mean = []
+    bursts_amps_std = []
+    bursts_amps_median = []
+    if data.burstlets:
+        bursts_amps = []
+        for burst_id in range(0, len(bursts_starts)):
+            curr_burst = data.bursts[burst_id]
+            channels = [interval.data['signal_id'] for interval in curr_burst]
+            for signal_id in channels:
+                first_spike_id = np.searchsorted(data.spikes[signal_id], bursts_starts[burst_id], 'left')
+                last_spike_id = np.searchsorted(data.spikes[signal_id], bursts_ends[burst_id], 'left')
+                last_id = last_spike_id + 1
+                if last_id >= len(data.spikes_amplitudes[signal_id]):
+                    last_id -= 1
+                for spike_id in range(first_spike_id, last_id):
+                    bursts_amps.append(data.spikes_amplitudes[signal_id][spike_id])
+        bursts_amps_max.append(np.max(bursts_amps))
+        bursts_amps_mean.append(np.mean(bursts_amps))
+        bursts_amps_std.append(np.std(bursts_amps))
+        bursts_amps_median.append(np.median(bursts_amps))
+    else:
+        for burst_id in range(0, len(bursts_starts)):
+            bursts_amps_max.append(data.bursts[burst_id]['max amplitude'])
+            bursts_amps_mean.append(data.bursts[burst_id]['mean amplitude'])
+            bursts_amps_std.append(data.bursts[burst_id]['std amplitude'])
+            bursts_amps_median.append(data.bursts[burst_id]['median amplitude'])
+
     data.channel_characteristics['Num bursts'] = num_bursts_per_channel
 
     burst_type = []
@@ -485,6 +527,10 @@ def calculate_characteristics(data, start, end, progress_callback):
     data.burst_characteristics['Number of spikes'] = num_spikes_per_burst
     data.burst_characteristics['Burst type'] = burst_type
     data.burst_characteristics['Number of channels'] = num_channels
+    data.burst_characteristics['Max amplitude'] = bursts_amps_max
+    data.burst_characteristics['Mean amplitude'] = bursts_amps_mean
+    data.burst_characteristics['Std amplitude'] = bursts_amps_std
+    data.burst_characteristics['Median amplitude'] = bursts_amps_median
     data.burst_characteristics['Channels'] = signals
 
     num_small_bursts = 0
@@ -498,6 +544,8 @@ def calculate_characteristics(data, start, end, progress_callback):
     data.global_characteristics['Number of small bursts'] = num_small_bursts
     data.global_characteristics['Number of large bursts'] = num_large_bursts
     data.global_characteristics['Mean burst duration'] = np.mean(bursts_duration)
+    data.global_characteristics['Max burst amplitude'] = np.max(bursts_amps_max)
+    data.global_characteristics['Mean burst amplitude'] = np.mean(bursts_amps_mean)
 
     progress_callback.emit(87)
 
@@ -510,9 +558,16 @@ def calculate_characteristics(data, start, end, progress_callback):
     finishes[-1] = str(datetime.timedelta(seconds=data.time[end_index]))
 
     num_bursts_each_minute = [0] * int(num_minutes + 1)
-    for burst_start in bursts_starts:
+    num_small_bursts_each_minute = [0] * int(num_minutes + 1)
+    num_large_bursts_each_minute = [0] * int(num_minutes + 1)
+    for burst_id in range(0, len(bursts_starts)):
+        burst_start = bursts_starts[burst_id]
         minute_id = int(burst_start / 60) - start
         num_bursts_each_minute[minute_id] += 1
+        if burst_type[burst_id] == 'small':
+            num_small_bursts_each_minute[minute_id] += 1
+        else:
+            num_large_bursts_each_minute[minute_id] += 1
 
     num_spikes_each_minute = [0] * int(num_minutes + 1)
     for signal_id in range(0, num_signals):
@@ -529,7 +584,9 @@ def calculate_characteristics(data, start, end, progress_callback):
 
     data.time_characteristics['Start'] = starts
     data.time_characteristics['End'] = finishes
-    data.time_characteristics['Num bursts per minute'] = num_bursts_each_minute
     data.time_characteristics['Num spikes per minute'] = num_spikes_each_minute
+    data.time_characteristics['Num bursts per minute'] = num_bursts_each_minute
+    data.time_characteristics['Num small bursts per minute'] = num_small_bursts_each_minute
+    data.time_characteristics['Num large bursts per minute'] = num_large_bursts_each_minute
 
     progress_callback.emit(89)
