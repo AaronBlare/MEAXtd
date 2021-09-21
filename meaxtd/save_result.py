@@ -37,7 +37,12 @@ def save_tables_to_file(data, filepath, progress_callback):
     progress_callback.emit(92)
 
     burst_df = pd.DataFrame(data=data.burst_characteristics)
-    burst_df.to_excel(path + 'burst.xlsx', index=False)
+    small_burst_df = burst_df.loc[burst_df['Burst type'] == 'small']
+    large_burst_df = burst_df.loc[burst_df['Burst type'] == 'large']
+    with pd.ExcelWriter(path + 'burst.xlsx') as writer:
+        burst_df.to_excel(writer, sheet_name='all', index=False)
+        small_burst_df.to_excel(writer, sheet_name='small', index=False)
+        large_burst_df.to_excel(writer, sheet_name='large', index=False)
 
     progress_callback.emit(93)
 
@@ -104,7 +109,7 @@ def save_params_to_file(path, progress_callback, params_dict):
     progress_callback.emit(100)
 
 
-def save_graph_to_file(path, progress_callback, graph, burst_id):
+def save_graph_to_file(path, progress_callback, graph, hub, burst_id):
 
     path = f"{path}/graph/"
     if not os.path.isdir(path):
@@ -113,6 +118,9 @@ def save_graph_to_file(path, progress_callback, graph, burst_id):
     graph.draw(path + 'graph_burst_' + str(burst_id + 1) + '.png')
     graph.draw(path + 'graph_burst_' + str(burst_id + 1) + '.pdf')
     graph.draw(path + 'graph_burst_' + str(burst_id + 1) + '.dot')
+
+    hub_df = pd.DataFrame(data=hub)
+    hub_df.to_excel(path + 'hubs_burst_' + str(burst_id + 1) + '.xlsx', index=False)
 
     progress_callback.emit(100)
 

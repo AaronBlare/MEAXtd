@@ -171,16 +171,26 @@ def construct_delayed_spikes_graph(data, progress_callback, burst_method, delta,
     for post_node in list(c_ij_top['Channel 2']):
         nodes[f"Electrode {post_node + 1}"]['total'] += 1
         nodes[f"Electrode {post_node + 1}"]['post'] += 1
+    total_num_edges = 0
     for node in nodes:
         graph.add_node(node,
                        label=f"{node} [{nodes[node]['total']}]",
                        width=nodes[node]['total'] / 4,
                        height=nodes[node]['total'] / 5)
+        total_num_edges += nodes[node]['total']
     for edge_id in range(0, len(c_ij_top['Channel 1'])):
         cell_1 = f"Electrode {list(c_ij_top['Channel 1'])[edge_id] + 1}"
         cell_2 = f"Electrode {list(c_ij_top['Channel 2'])[edge_id] + 1}"
         graph.add_edge(cell_1, cell_2, weight=nodes[cell_2]['post'], label=f"{list(c_ij_top['tau'])[edge_id]}ms")
     graph.layout("dot")
     data.graph = graph
+
+    hub_dict = {'Electrode': [], 'Number of connections': [], 'Hub coefficient': []}
+    for node in nodes:
+        hub_dict['Electrode'].append(int(node[10:]))
+        hub_dict['Number of connections'].append(nodes[node]['total'])
+        hub_dict['Hub coefficient'].append(nodes[node]['total'] / total_num_edges)
+
+    data.graph_hub = hub_dict
 
     progress_callback.emit(99)

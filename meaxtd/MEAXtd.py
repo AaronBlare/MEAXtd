@@ -828,7 +828,8 @@ class MEAXtd(QMainWindow):
 
         self.logger.info(f"Graph for burst {burst_id + 1} built.")
 
-        graph_file = save_graph_to_file(self.path_to_save, progress_callback, self.data.graph, burst_id)
+        graph_file = save_graph_to_file(self.path_to_save, progress_callback,
+                                        self.data.graph, self.data.graph_hub, burst_id)
 
         pixmap = QPixmap.fromImage(graph_file)
         if pixmap.height() > self.graph_picture_panel.height() or pixmap.width() > self.graph_picture_panel.width():
