@@ -1,4 +1,5 @@
 import sys
+import re
 import traceback
 import pyqtgraph as pg
 import numpy as np
@@ -97,6 +98,14 @@ class ThreadLogger(logging.Handler):
         self.log.signal.emit(msg)
 
 
+class TableWidgetItem(QTableWidgetItem):
+    def __lt__(self, other):
+        try:
+            return float(self.text()) < float(other.text())
+        except ValueError:
+            return self.text() < other.text()
+
+
 class MEAXtd(QMainWindow):
     """Create the main window that stores all of the widgets necessary for the application."""
 
@@ -110,12 +119,12 @@ class MEAXtd(QMainWindow):
 
         self.av_width = rect.width()
         self.av_height = rect.height()
-        self.setMaximumSize(self.av_width, self.av_height)
+        # self.setMaximumSize(self.av_width, self.av_height)
         self.resize(int(self.av_width * 0.9), int(self.av_height * 0.75))
 
         self.menu_bar = self.menuBar()
         self.about_dialog = AboutDialog()
-        self.status_bar = self.statusBar()
+        # self.status_bar = self.statusBar()
         # self.status_bar.showMessage('Ready')
         self.file_menu()
         self.help_menu()
@@ -133,7 +142,7 @@ class MEAXtd(QMainWindow):
         self.tabs = QTabWidget(self.central_widget)
         tab_size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         tab_size_policy.setHorizontalStretch(0)
-        tab_size_policy.setVerticalStretch(10)
+        tab_size_policy.setVerticalStretch(15)
         tab_size_policy_flag = self.tabs.sizePolicy().hasHeightForWidth()
         tab_size_policy.setHeightForWidth(tab_size_policy_flag)
         self.tabs.setSizePolicy(tab_size_policy)
@@ -194,6 +203,10 @@ class MEAXtd(QMainWindow):
         self.stat.remove_plots(self.stat_left_groupbox_layout, self.stat_right_groupbox_layout)
         self.create_char_layout()
 
+    @Slot()
+    def spinbox_change(self):
+        self.process_graph()
+
     def file_menu(self):
         """Create a file submenu with an Open File item that opens a file dialog."""
         self.file_sub_menu = self.menu_bar.addMenu('File')
@@ -233,6 +246,8 @@ class MEAXtd(QMainWindow):
         if self.data:
             self.logger.info(f"File loaded.")
             self.processqbtn.setEnabled(True)
+            self.processqbtn.setAutoDefault(True)
+            self.processqbtn.setFocus()
             self.plot.set_data(self.data, 0, int(np.ceil(self.data.time[-1] / 60)))
             self.stat.set_data(self.data, 0, int(np.ceil(self.data.time[-1] / 60)))
             self.plot.plot_signals(self.plot_grid)
@@ -611,6 +626,10 @@ class MEAXtd(QMainWindow):
         find_bursts(self.data, self.excluded_channels, spike_method, spike_coeff, burst_method, burst_window,
                     burst_param, start, end, progress_callback)
 
+        self.TSR_threshold = np.mean(self.data.TSR) + burst_param * np.std(self.data.TSR)
+        self.stat.set_threshold(self.TSR_threshold)
+        self.stat.plot_tsr(self.stat_left_groupbox_layout)
+
         self.logger.info(f"TSR threshold: {np.mean(self.data.TSR) + burst_param * np.std(self.data.TSR)}")
         self.logger.info(f"TSR mean: {np.mean(self.data.TSR)}; TSR std: {np.std(self.data.TSR)}")
 
@@ -644,8 +663,13 @@ class MEAXtd(QMainWindow):
             self.logger.info("Characteristics calculated.")
             self.char_global_table.setRowCount(len(list(self.data.global_characteristics.keys())))
             for n, key in enumerate(self.data.global_characteristics):
-                self.char_global_table.setItem(n, 0, QTableWidgetItem(key))
-                self.char_global_table.setItem(n, 1, QTableWidgetItem(str(self.data.global_characteristics[key])))
+                curr_tab_item_0 = TableWidgetItem()
+                curr_tab_item_0.setData(Qt.EditRole, key)
+                self.char_global_table.setItem(n, 0, curr_tab_item_0)
+
+                curr_item = round(self.data.global_characteristics[key], 4)
+                curr_tab_item_1 = TableWidgetItem(str(curr_item))
+                self.char_global_table.setItem(n, 1, curr_tab_item_1)
 
         if self.data.channel_characteristics:
             headers = list(self.data.channel_characteristics.keys())
@@ -655,8 +679,18 @@ class MEAXtd(QMainWindow):
             for signal_id in range(0, self.data.stream.shape[1]):
                 if signal_id not in self.excluded_channels:
                     for n, key in enumerate(self.data.channel_characteristics):
-                        self.char_channel_table.setItem(signal_id - signal_shift, n, QTableWidgetItem(
-                            str(self.data.channel_characteristics[key][signal_id])))
+                        curr_item = self.data.channel_characteristics[key][signal_id]
+                        if isinstance(self.data.channel_characteristics[key][signal_id], float):
+                            curr_item = round(self.data.channel_characteristics[key][signal_id], 4)
+                            curr_tab_item = TableWidgetItem(str(curr_item))
+                            self.char_channel_table.setItem(signal_id - signal_shift, n, curr_tab_item)
+                        elif isinstance(self.data.channel_characteristics[key][signal_id], np.int32):
+                            curr_tab_item = TableWidgetItem(str(curr_item))
+                            self.char_channel_table.setItem(signal_id - signal_shift, n, curr_tab_item)
+                        else:
+                            curr_tab_item = TableWidgetItem()
+                            curr_tab_item.setData(Qt.EditRole, curr_item)
+                            self.char_channel_table.setItem(signal_id - signal_shift, n, curr_tab_item)
                 else:
                     signal_shift += 1
             self.char_channel_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
@@ -673,13 +707,37 @@ class MEAXtd(QMainWindow):
 
             for burst_id in range(0, len(self.data.bursts)):
                 for n, key in enumerate(self.data.burst_characteristics):
-                    self.char_burst_table.setItem(burst_id, n, QTableWidgetItem(
-                        str(self.data.burst_characteristics[key][burst_id])))
-
                     curr_item = self.data.burst_characteristics[key][burst_id]
                     if isinstance(self.data.burst_characteristics[key][burst_id], float):
                         curr_item = round(self.data.burst_characteristics[key][burst_id], 2)
-                    self.graph_table.setItem(burst_id, n, QTableWidgetItem(str(curr_item)))
+                        if curr_item == 0.0:
+                            curr_item = round(self.data.burst_characteristics[key][burst_id], 6)
+                        curr_tab_item = TableWidgetItem(str(curr_item))
+                        self.char_burst_table.setItem(burst_id, n, curr_tab_item)
+                    elif isinstance(self.data.burst_characteristics[key][burst_id], np.int32):
+                        curr_tab_item = TableWidgetItem(str(curr_item))
+                        self.char_burst_table.setItem(burst_id, n, curr_tab_item)
+                    else:
+                        curr_tab_item = TableWidgetItem()
+                        curr_tab_item.setData(Qt.EditRole, curr_item)
+                        self.char_burst_table.setItem(burst_id, n, curr_tab_item)
+
+            for burst_id in range(0, len(self.data.bursts)):
+                for n, key in enumerate(self.data.burst_characteristics):
+                    curr_item = self.data.burst_characteristics[key][burst_id]
+                    if isinstance(self.data.burst_characteristics[key][burst_id], float):
+                        curr_item = round(self.data.burst_characteristics[key][burst_id], 2)
+                        if curr_item == 0.0:
+                            curr_item = round(self.data.burst_characteristics[key][burst_id], 6)
+                        curr_tab_item = TableWidgetItem(str(curr_item))
+                        self.graph_table.setItem(burst_id, n, curr_tab_item)
+                    elif isinstance(self.data.burst_characteristics[key][burst_id], np.int32):
+                        curr_tab_item = TableWidgetItem(str(curr_item))
+                        self.graph_table.setItem(burst_id, n, curr_tab_item)
+                    else:
+                        curr_tab_item = TableWidgetItem()
+                        curr_tab_item.setData(Qt.EditRole, curr_item)
+                        self.graph_table.setItem(burst_id, n, curr_tab_item)
 
             self.char_burst_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
             self.graph_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
@@ -694,9 +752,29 @@ class MEAXtd(QMainWindow):
             self.char_time_table.setHorizontalHeaderLabels(headers)
             for minute_id in range(0, len(self.data.time_characteristics['Start'])):
                 for n, key in enumerate(self.data.time_characteristics):
-                    self.char_time_table.setItem(minute_id, n, QTableWidgetItem(
-                        str(self.data.time_characteristics[key][minute_id])))
-            self.char_time_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+                    curr_item = self.data.time_characteristics[key][minute_id]
+                    if isinstance(self.data.time_characteristics[key][minute_id], float):
+                        curr_item = round(self.data.time_characteristics[key][minute_id], 2)
+                        curr_tab_item = TableWidgetItem(str(curr_item))
+                        self.char_time_table.setItem(minute_id, n, curr_tab_item)
+                    elif isinstance(self.data.time_characteristics[key][minute_id], np.int32):
+                        curr_tab_item = TableWidgetItem(str(curr_item))
+                        self.char_time_table.setItem(minute_id, n, curr_tab_item)
+                    else:
+                        curr_tab_item = TableWidgetItem()
+                        curr_tab_item.setData(Qt.EditRole, curr_item)
+                        self.char_time_table.setItem(minute_id, n, curr_tab_item)
+            self.char_time_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+
+        self.char_global_table.setSortingEnabled(True)
+        self.char_channel_table.setSortingEnabled(True)
+        self.char_channel_table.sortItems(0, Qt.AscendingOrder)
+        self.char_burst_table.setSortingEnabled(True)
+        self.char_burst_table.sortItems(0, Qt.AscendingOrder)
+        self.char_time_table.setSortingEnabled(True)
+        self.char_time_table.sortItems(0, Qt.AscendingOrder)
+        self.graph_table.setSortingEnabled(True)
+        self.graph_table.sortItems(0, Qt.AscendingOrder)
 
         self.path_to_save = save_tables_to_file(self.data, self.filename, progress_callback)
 
@@ -707,6 +785,9 @@ class MEAXtd(QMainWindow):
 
         if self.data.bursts:
             self.build_graph_btn.setEnabled(True)
+            self.burst_id_spinbox.setEnabled(True)
+            self.curr_burst_id = None
+            # setKeyboardTracking(False)
 
     def save_characteristics(self):
         self.logger.info(f"Characteristics saved to {self.path_to_save}")
@@ -738,13 +819,18 @@ class MEAXtd(QMainWindow):
         cutoff = self.graph_params_cutoff_spinbox.value()
         burst_id = self.burst_id_spinbox.value() - 1
 
+        if burst_id == self.curr_burst_id:
+            return
+
         self.logger.info(f"Graph for burst {burst_id + 1} building...")
 
         construct_delayed_spikes_graph(self.data, progress_callback, burst_method, delta, num_frames, cutoff, burst_id)
+        self.curr_burst_id = burst_id
 
         self.logger.info(f"Graph for burst {burst_id + 1} built.")
 
-        graph_file = save_graph_to_file(self.path_to_save, progress_callback, self.data.graph, burst_id)
+        graph_file = save_graph_to_file(self.path_to_save, progress_callback,
+                                        self.data.graph, self.data.graph_hub, burst_id)
 
         pixmap = QPixmap.fromImage(graph_file)
         if pixmap.height() > self.graph_picture_panel.height() or pixmap.width() > self.graph_picture_panel.width():
@@ -1185,7 +1271,7 @@ class MEAXtd(QMainWindow):
         headers = ['Characteristic', 'Value']
         self.char_global_table.setColumnCount(2)
         self.char_global_table.setHorizontalHeaderLabels(headers)
-        self.char_global_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.char_global_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.char_global_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.char_global_table.verticalHeader().setVisible(False)
         self.char_tab_layout.addWidget(self.char_global_table, 1, 0, 1, 1)
@@ -1318,8 +1404,10 @@ class MEAXtd(QMainWindow):
         self.graph_navigation_groupbox_layout.addWidget(self.burst_id_label, 0, 0, 1, 1)
 
         self.burst_id_spinbox = QSpinBox(self.graph_navigation_groupbox)
+        self.burst_id_spinbox.setDisabled(True)
         self.burst_id_spinbox.setValue(1)
         self.burst_id_spinbox.valueChanged.connect(self.burst_id_spinbox_change)
+        self.burst_id_spinbox.editingFinished.connect(self.spinbox_change)
         self.graph_navigation_groupbox_layout.addWidget(self.burst_id_spinbox, 0, 1, 1, 1)
 
         self.build_graph_btn = QPushButton(self.graph_navigation_groupbox, text="Build Graph")
@@ -1355,7 +1443,7 @@ class MEAXtd(QMainWindow):
 
     def create_logging_layout(self):
         self.main_logging_groupbox = QGroupBox(self.central_widget)
-        main_logging_size_policy = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Expanding)
+        main_logging_size_policy = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Ignored)
         main_logging_size_policy.setHorizontalStretch(0)
         main_logging_size_policy.setVerticalStretch(1)
         policy_flag = self.main_logging_groupbox.sizePolicy().hasHeightForWidth()
@@ -1363,7 +1451,7 @@ class MEAXtd(QMainWindow):
         self.main_logging_groupbox.setSizePolicy(main_logging_size_policy)
 
         self.logger_font = QFont()
-        self.logger_font.setPointSize(14)
+        self.logger_font.setPointSize(10)
 
         self.main_logging_groupbox.setFont(self.logger_font)
         self.log_groupbox_layout = QHBoxLayout(self.main_logging_groupbox)
@@ -1382,7 +1470,7 @@ class MEAXtd(QMainWindow):
         self.log_window.setReadOnly(True)
         size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         size_policy.setHorizontalStretch(0)
-        size_policy.setVerticalStretch(0)
+        size_policy.setVerticalStretch(1)
         size_policy_flag = self.log_window.sizePolicy().hasHeightForWidth()
         size_policy.setHeightForWidth(size_policy_flag)
         self.log_window.setSizePolicy(size_policy)
@@ -1684,6 +1772,9 @@ class StatDialog(QDialog):
         self.start = start
         self.end = end
 
+    def set_threshold(self, thr):
+        self.TSR_threshold = thr
+
     def init_ui(self, left_layout, right_layout):
         self.configure_left(left_layout)
         self.configure_right(right_layout)
@@ -1743,11 +1834,14 @@ class StatDialog(QDialog):
     def plot_tsr(self, left_layout):
         tplot = tsr_plot(self.data)
         left_layout.layout().itemAtPosition(0, 0).widget().addItem(tplot)
-        left_layout.layout().itemAtPosition(0, 0).widget().setLimits(yMin=-3, yMax=max(self.data.TSR) + 1,
+        if hasattr(self, 'TSR_threshold'):
+            tplot_thr = tsr_plot_threshold(self.data, self.TSR_threshold)
+            left_layout.layout().itemAtPosition(0, 0).widget().addItem(tplot_thr)
+        left_layout.layout().itemAtPosition(0, 0).widget().setLimits(yMin=-0.1, yMax=max(self.data.TSR) + 1,
                                                                      xMin=0, xMax=self.data.time[-1])
         left_layout.layout().itemAtPosition(0, 0).widget().setYRange(-1, max(self.data.TSR) + 1)
         left_layout.layout().itemAtPosition(0, 0).widget().setXRange(0, self.data.time[-1])
-        left_layout.layout().itemAtPosition(0, 0).widget().getPlotItem().hideAxis('bottom')
+        # left_layout.layout().itemAtPosition(0, 0).widget().getPlotItem().hideAxis('bottom')
 
     def plot_colormap(self, right_layout):
         cm = pg.colormap.get('CET-R4')
