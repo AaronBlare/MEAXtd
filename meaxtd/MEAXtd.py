@@ -9,9 +9,9 @@ from meaxtd.hdf5plot import HDF5PlotXY
 from meaxtd.find_bursts import find_spikes, find_bursts, calculate_characteristics
 from meaxtd.construct_graph import construct_delayed_spikes_graph
 from meaxtd.save_result import save_tables_to_file, save_plots_to_file, save_params_to_file, save_graph_to_file
-from meaxtd.stat_plots import raster_plot, tsr_plot, colormap_plot
+from meaxtd.stat_plots import raster_plot, tsr_plot, colormap_plot, tsr_plot_threshold
 from PySide6.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal
-from PySide6.QtGui import QIcon, QFont, QAction, QScreen
+from PySide6.QtGui import QIcon, QFont, QAction, QScreen, QPixmap
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QLayout, QFrame, QSizePolicy,
                                QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget, QTabWidget, QSpacerItem,
                                QGroupBox, QGridLayout, QPushButton, QComboBox, QRadioButton, QPlainTextEdit,
