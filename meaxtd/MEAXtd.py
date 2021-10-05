@@ -10,13 +10,13 @@ from meaxtd.find_bursts import find_spikes, find_bursts, calculate_characteristi
 from meaxtd.construct_graph import construct_delayed_spikes_graph
 from meaxtd.save_result import save_tables_to_file, save_plots_to_file, save_params_to_file, save_graph_to_file
 from meaxtd.stat_plots import raster_plot, tsr_plot, tsr_plot_threshold, colormap_plot
-from PySide2.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal, QSize
-from PySide2.QtGui import QFont, QPixmap
+from PySide2.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal, QSize, QPoint, QRectF
+from PySide2.QtGui import QFont, QPixmap, QBrush, QColor
 from PySide2.QtWidgets import (QApplication, QDialog, QFileDialog, QLayout, QFrame, QSizePolicy, QAction,
                                QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget, QTabWidget, QSpacerItem,
                                QGroupBox, QGridLayout, QPushButton, QComboBox, QRadioButton, QPlainTextEdit,
                                QProgressBar, QDoubleSpinBox, QSpinBox, QTableWidget, QTableWidgetItem, QHeaderView,
-                               QStyleFactory)
+                               QStyleFactory, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem)
 
 pg.setConfigOption('background', 'w')
 pg.setConfigOption('foreground', 'k')
@@ -104,6 +104,84 @@ class TableWidgetItem(QTableWidgetItem):
             return float(self.text()) < float(other.text())
         except ValueError:
             return self.text() < other.text()
+
+
+class PhotoViewer(QGraphicsView):
+    photoClicked = Signal(QPoint)
+
+    def __init__(self, parent):
+        super(PhotoViewer, self).__init__(parent)
+        self._zoom = 0
+        self._empty = True
+        self._scene = QGraphicsScene(self)
+        self._photo = QGraphicsPixmapItem()
+        self._photo.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
+        self._scene.addItem(self._photo)
+        self.setScene(self._scene)
+        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setBackgroundBrush(QBrush(QColor(255, 255, 255)))
+        self.setFrameShape(QFrame.NoFrame)
+
+    def hasPhoto(self):
+        return not self._empty
+
+    def fitInView(self, scale=True):
+        rect = QRectF(self._photo.pixmap().rect())
+        if not rect.isNull():
+            self.setSceneRect(rect)
+            if self.hasPhoto():
+                unity = self.transform().mapRect(QRectF(0, 0, 1, 1))
+                self.scale(1 / unity.width(), 1 / unity.height())
+                viewrect = self.viewport().rect()
+                scenerect = self.transform().mapRect(rect)
+                factor = min(viewrect.width() / scenerect.width(),
+                             viewrect.height() / scenerect.height())
+                self.scale(factor, factor)
+            self._zoom = 0
+
+    def setPhoto(self, pixmap=None):
+        self._zoom = 0
+        self._photo = QGraphicsPixmapItem()
+        self._photo.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
+        if pixmap and not pixmap.isNull():
+            self._empty = False
+            self.setDragMode(QGraphicsView.ScrollHandDrag)
+            self._photo.setPixmap(pixmap)
+            self._scene.addItem(self._photo)
+        else:
+            self._empty = True
+            self.setDragMode(QGraphicsView.NoDrag)
+            self._photo.setPixmap(QPixmap())
+        self.fitInView()
+
+    def wheelEvent(self, event):
+        if self.hasPhoto():
+            if event.angleDelta().y() > 0:
+                factor = 1.25
+                self._zoom += 1
+            else:
+                factor = 0.8
+                self._zoom -= 1
+            if self._zoom > 0:
+                self.scale(factor, factor)
+            elif self._zoom == 0:
+                self.fitInView()
+            else:
+                self._zoom = 0
+
+    def toggleDragMode(self):
+        if self.dragMode() == QGraphicsView.ScrollHandDrag:
+            self.setDragMode(QGraphicsView.NoDrag)
+        elif not self._photo.pixmap().isNull():
+            self.setDragMode(QGraphicsView.ScrollHandDrag)
+
+    def mousePressEvent(self, event):
+        if self._photo.isUnderMouse():
+            self.photoClicked.emit(self.mapToScene(event.pos()).toPoint())
+        super(PhotoViewer, self).mousePressEvent(event)
 
 
 class MEAXtd(QMainWindow):
@@ -831,13 +909,7 @@ class MEAXtd(QMainWindow):
         graph_file = save_graph_to_file(self.path_to_save, progress_callback,
                                         self.data.graph, self.data.graph_hub, burst_id)
 
-        pixmap = QPixmap.fromImage(graph_file)
-        if pixmap.height() > self.graph_picture_panel.height() or pixmap.width() > self.graph_picture_panel.width():
-            pixmap_scaled = pixmap.scaled(0.9 * self.graph_picture_panel.size(),
-                                          Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            self.graph_picture.setPixmap(pixmap_scaled)
-        else:
-            self.graph_picture.setPixmap(pixmap)
+        self.graph_picture.setPhoto(QPixmap(graph_file))
 
     def process_graph(self):
         if self.data.bursts:
@@ -1435,8 +1507,8 @@ class MEAXtd(QMainWindow):
         self.graph_picture_panel.setSizePolicy(size_policy_graph_right)
         self.graph_picture_panel_layout = QVBoxLayout(self.graph_picture_panel)
 
-        self.graph_picture = QLabel(self.graph_picture_panel)
-        self.graph_picture_panel_layout.addWidget(self.graph_picture, alignment=Qt.AlignCenter)
+        self.graph_picture = PhotoViewer(self.graph_picture_panel)
+        self.graph_picture_panel_layout.addWidget(self.graph_picture)
 
         self.graph_tab_layout.addWidget(self.graph_picture_panel)
 
