@@ -418,8 +418,13 @@ def calculate_characteristics(data, start, end, progress_callback):
     progress_callback.emit(82)
 
     num_spikes = []
+    is_channel_active = []
     for signal_id in range(0, num_signals):
         num_spikes.append(len(data.spikes[signal_id]))
+        if len(data.spikes[signal_id]) > 20:
+            is_channel_active.append('yes')
+        else:
+            is_channel_active.append('no')
     firing_rate = []
     firing_rate_ms = []
     firing_rate_bin = []
@@ -434,6 +439,7 @@ def calculate_characteristics(data, start, end, progress_callback):
     data.channel_characteristics['Burst activation mean'] = data.burst_activation
     data.channel_characteristics['Num spikes per ms'] = firing_rate_ms
     data.channel_characteristics['Num spikes per 50 ms bin'] = firing_rate_bin
+    data.channel_characteristics['Active channel'] = is_channel_active
 
     progress_callback.emit(85)
 
@@ -546,6 +552,7 @@ def calculate_characteristics(data, start, end, progress_callback):
     data.global_characteristics['Mean burst duration'] = np.mean(bursts_duration)
     data.global_characteristics['Max burst amplitude'] = np.max(bursts_amps_max)
     data.global_characteristics['Mean burst amplitude'] = np.mean(bursts_amps_mean)
+    data.global_characteristics['Num active channels'] = is_channel_active.count('yes')
 
     progress_callback.emit(87)
 
