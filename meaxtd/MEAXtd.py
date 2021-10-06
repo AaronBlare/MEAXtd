@@ -145,8 +145,9 @@ class PhotoViewer(QGraphicsView):
     def setPhoto(self, pixmap=None):
         self._zoom = 0
         if len(self.scene().items()) > 1:
-            curr_item = self.scene().items()[1]
-            self.scene().removeItem(curr_item)
+            for item_id in range(1, len(self.scene().items())):
+                curr_item = self.scene().items()[item_id]
+                self.scene().removeItem(curr_item)
         self._photo = QGraphicsPixmapItem()
         self._photo.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
         if pixmap and not pixmap.isNull():
@@ -1392,6 +1393,12 @@ class MEAXtd(QMainWindow):
         self.char_time_label.setFont(self.gbox_font)
         self.char_tab_layout.addWidget(self.char_time_label, 0, 4, 1, 1)
 
+    def choose_burst_cell(self):
+        curr_row = self.graph_table.currentRow()
+        cell_value = self.graph_table.item(curr_row, 0).text()
+        burst_id = int(cell_value)
+        self.burst_id_spinbox.setValue(burst_id)
+
     def create_graph_layout(self):
         self.graph_info_panel = QWidget(self.graph_tab)
         size_policy_graph_left = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -1403,6 +1410,7 @@ class MEAXtd(QMainWindow):
         self.graph_info_panel_layout = QGridLayout(self.graph_info_panel)
 
         self.graph_table = QTableWidget(self.graph_info_panel)
+        self.graph_table.cellClicked.connect(lambda: self.choose_burst_cell())
         self.graph_info_panel_layout.addWidget(self.graph_table, 0, 0, 1, 1)
         self.graph_table.verticalHeader().setVisible(False)
 
