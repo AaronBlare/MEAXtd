@@ -709,6 +709,8 @@ class MEAXtd(QMainWindow):
         self.logger.info(f"TSR threshold: {np.mean(self.data.TSR) + burst_param * np.std(self.data.TSR)}")
         self.logger.info(f"TSR mean: {np.mean(self.data.TSR)}; TSR std: {np.std(self.data.TSR)}")
 
+        self.tabs.setCurrentWidget(self.stat_tab)
+
         excluded_channels = self.excluded_channels
         excluded_channels.sort()
         excluded_channels = [channel + 1 for channel in excluded_channels]
