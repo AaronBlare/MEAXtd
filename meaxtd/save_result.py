@@ -55,7 +55,6 @@ def save_tables_to_file(data, filepath, progress_callback):
 
 
 def save_plots_to_file(path, progress_callback, left_groupbox, right_groupbox, left_layout, right_layout):
-
     # tsr_exporter_svg = pg.exporters.SVGExporter(left_layout.layout().itemAtPosition(0, 0).widget().scene())
     # tsr_exporter_svg.export(path + 'TSR.svg')
 
@@ -110,7 +109,6 @@ def save_plots_to_file(path, progress_callback, left_groupbox, right_groupbox, l
 
 
 def save_params_to_file(path, progress_callback, params_dict):
-
     f = open(path + 'params.txt', 'w')
     f.write('Parameter\tValue\n')
     for key in params_dict:
@@ -127,7 +125,6 @@ def save_params_to_file(path, progress_callback, params_dict):
 
 
 def save_graph_to_file(path, progress_callback, graph, hub, burst_id):
-
     path = f"{path}/graph/"
     if not os.path.isdir(path):
         Path(path).mkdir(parents=True)

@@ -159,7 +159,7 @@ def construct_delayed_spikes_graph(data, progress_callback, burst_method, delta,
     if len(c_ij_sorted_df['C_ij_max']) > 0:
         percentile_value = np.percentile(c_ij_sorted_df['C_ij_max'], 100 - cutoff)
     else:
-        percentile_value = max(c_ij_sorted_df['C_ij_max'])
+        percentile_value = 0
     c_ij_top = c_ij_sorted_df[c_ij_sorted_df['C_ij_max'] > percentile_value]
 
     progress_callback.emit(90)
