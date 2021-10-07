@@ -403,17 +403,17 @@ def calculate_characteristics(data, start, end, progress_callback):
 
     data.global_characteristics['Total number of spikes'] = total_num_spikes
     data.global_characteristics['Num spikes per second'] = num_spikes_per_second
-    data.global_characteristics['Mean spike amplitude'] = mean_spike_amplitude
-    data.global_characteristics['Std spike amplitude'] = std_spike_amplitude
-    data.global_characteristics['Median spike amplitude'] = median_spike_amplitude
-    data.global_characteristics['Raster duration in sec'] = raster_duration_sec
-    data.global_characteristics['Raster duration in ms'] = raster_duration_ms
+    data.global_characteristics['Mean spike amplitude, μV'] = mean_spike_amplitude
+    data.global_characteristics['Std spike amplitude, μV'] = std_spike_amplitude
+    data.global_characteristics['Median spike amplitude, μV'] = median_spike_amplitude
+    data.global_characteristics['Raster duration, sec'] = raster_duration_sec
+    data.global_characteristics['Raster duration, ms'] = raster_duration_ms
     data.global_characteristics['Total number of bursts'] = total_num_bursts
     data.global_characteristics['Num bursts per minute'] = num_bursts_per_min
-    data.global_characteristics['Time bin in ms'] = time_bin
+    data.global_characteristics['Time bin, ms'] = time_bin
     data.global_characteristics['Mean number of spikes in time bin'] = mean_num_spikes_time_bin
     data.global_characteristics['Std number of spikes in time bin'] = std_num_spikes_time_bin
-    data.global_characteristics['Mean burst activation'] = mean_burst_activation
+    data.global_characteristics['Mean burst activation, s'] = mean_burst_activation
 
     progress_callback.emit(82)
 
@@ -434,9 +434,9 @@ def calculate_characteristics(data, start, end, progress_callback):
         firing_rate_bin.append(num_spikes[signal_id] / (num_seconds * 1000 / 50))
 
     data.channel_characteristics['Channel'] = [i + 1 for i in range(0, num_signals)]
-    data.channel_characteristics['Number of spikes'] = num_spikes
+    data.channel_characteristics['Num spikes'] = num_spikes
     data.channel_characteristics['Num spikes per second'] = firing_rate
-    data.channel_characteristics['Burst activation mean'] = data.burst_activation
+    data.channel_characteristics['Burst activation mean, s'] = data.burst_activation
     data.channel_characteristics['Num spikes per ms'] = firing_rate_ms
     data.channel_characteristics['Num spikes per 50 ms bin'] = firing_rate_bin
     data.channel_characteristics['Active channel'] = is_channel_active
@@ -529,14 +529,14 @@ def calculate_characteristics(data, start, end, progress_callback):
     data.burst_characteristics['Burst ID'] = [i + 1 for i in range(0, len(data.bursts))]
     data.burst_characteristics['Start'] = bursts_starts
     data.burst_characteristics['End'] = bursts_ends
-    data.burst_characteristics['Duration'] = bursts_duration
-    data.burst_characteristics['Number of spikes'] = num_spikes_per_burst
+    data.burst_characteristics['Duration, s'] = bursts_duration
+    data.burst_characteristics['Num spikes'] = num_spikes_per_burst
     data.burst_characteristics['Burst type'] = burst_type
-    data.burst_characteristics['Number of channels'] = num_channels
-    data.burst_characteristics['Max amplitude'] = bursts_amps_max
-    data.burst_characteristics['Mean amplitude'] = bursts_amps_mean
-    data.burst_characteristics['Std amplitude'] = bursts_amps_std
-    data.burst_characteristics['Median amplitude'] = bursts_amps_median
+    data.burst_characteristics['Num channels'] = num_channels
+    data.burst_characteristics['Max amplitude, μV'] = bursts_amps_max
+    data.burst_characteristics['Mean amplitude, μV'] = bursts_amps_mean
+    data.burst_characteristics['Std amplitude, μV'] = bursts_amps_std
+    data.burst_characteristics['Median amplitude, μV'] = bursts_amps_median
     data.burst_characteristics['Channels'] = signals
 
     num_small_bursts = 0
@@ -547,12 +547,16 @@ def calculate_characteristics(data, start, end, progress_callback):
         else:
             num_large_bursts += 1
 
-    data.global_characteristics['Number of small bursts'] = num_small_bursts
-    data.global_characteristics['Number of large bursts'] = num_large_bursts
-    data.global_characteristics['Mean burst duration'] = np.mean(bursts_duration)
-    data.global_characteristics['Max burst amplitude'] = np.max(bursts_amps_max)
-    data.global_characteristics['Mean burst amplitude'] = np.mean(bursts_amps_mean)
+    data.global_characteristics['Num small bursts'] = num_small_bursts
+    data.global_characteristics['Num large bursts'] = num_large_bursts
+    data.global_characteristics['Mean burst duration, s'] = np.mean(bursts_duration)
+    data.global_characteristics['Max burst amplitude, μV'] = np.max(bursts_amps_max)
+    data.global_characteristics['Mean burst amplitude, μV'] = np.mean(bursts_amps_mean)
     data.global_characteristics['Num active channels'] = is_channel_active.count('yes')
+    data.global_characteristics['Num spikes in bursts'] = np.sum(num_spikes_per_burst)
+    data.global_characteristics['% spikes in bursts'] = (np.sum(num_spikes_per_burst) / total_num_spikes) * 100
+    data.global_characteristics['Num spikes outside bursts'] = total_num_spikes - np.sum(num_spikes_per_burst)
+    data.global_characteristics['% spikes outside bursts'] = 100 - data.global_characteristics['% spikes in bursts']
 
     progress_callback.emit(87)
 
