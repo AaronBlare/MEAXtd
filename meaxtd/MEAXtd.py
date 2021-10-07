@@ -1931,7 +1931,10 @@ class StatDialog(QDialog):
             act_bar = right_layout.layout().itemAtPosition(0, 0).widget().plotItem.layout.itemAt(2, 5)
             act_bar.setLevels(values=(0, act_max_value))
         else:
-            act_bar = pg.ColorBarItem(interactive=False, values=(0, act_max_value), cmap=cm, label="Spike times, s")
+            act_bar = pg.ColorBarItem(interactive=False,
+                                      values=(0, act_max_value),
+                                      cmap=cm,
+                                      label="Spike times, ms")
         act_bar.setImageItem(act_plot, insert_in=right_layout.layout().itemAtPosition(0, 0).widget().plotItem)
 
         deact_max_value = np.max(self.data.burst_deactivation)
@@ -1941,7 +1944,10 @@ class StatDialog(QDialog):
             deact_bar = right_layout.layout().itemAtPosition(1, 0).widget().plotItem.layout.itemAt(2, 5)
             deact_bar.setLevels(values=(0, deact_max_value))
         else:
-            deact_bar = pg.ColorBarItem(interactive=False, values=(0, deact_max_value), cmap=cm, label="Spike times, s")
+            deact_bar = pg.ColorBarItem(interactive=False,
+                                        values=(0, deact_max_value),
+                                        cmap=cm,
+                                        label="Spike times, ms")
         deact_bar.setImageItem(deact_plot, insert_in=right_layout.layout().itemAtPosition(1, 0).widget().plotItem)
 
     def remove_plots(self, left_layout, right_layout):

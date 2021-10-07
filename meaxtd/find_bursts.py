@@ -337,9 +337,9 @@ def find_bursts(data, excluded_channels, spike_method, spike_coeff, burst_method
                     num_deactivations += 1
                     curr_deactivations += burst_deactivation_vector[burst_id, signal_id]
             if num_activations > 0:
-                data.burst_activation[signal_id] = curr_activations / num_activations
+                data.burst_activation[signal_id] = (curr_activations / num_activations) * 1000   # in ms
             if num_deactivations > 0:
-                data.burst_deactivation[signal_id] = curr_deactivations / num_deactivations
+                data.burst_deactivation[signal_id] = (curr_deactivations / num_deactivations) * 1000   # in ms
 
     for signal_id in range(0, num_signals):
         data.burst_stream[signal_id] = np.empty(len(data.stream[:, signal_id]))
