@@ -1913,6 +1913,10 @@ class StatDialog(QDialog):
     def plot_tsr(self, left_layout):
         tplot = tsr_plot(self.data)
         left_layout.layout().itemAtPosition(0, 0).widget().addItem(tplot)
+        left_layout.layout().itemAtPosition(0, 0).widget().plotItem.items[0].opts['symbol'] = None
+        left_layout.layout().itemAtPosition(0, 0).widget().plotItem.items[0].opts['symbolPen'] = None
+        left_layout.layout().itemAtPosition(0, 0).widget().plotItem.items[0].opts['symbolBrush'] = None
+        left_layout.layout().itemAtPosition(0, 0).widget().plotItem.items[0].opts['symbolSize'] = None
         if hasattr(self, 'TSR_threshold'):
             tplot_thr = tsr_plot_threshold(self.data, self.TSR_threshold)
             left_layout.layout().itemAtPosition(0, 0).widget().addItem(tplot_thr)
