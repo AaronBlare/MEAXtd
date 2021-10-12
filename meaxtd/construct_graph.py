@@ -188,11 +188,27 @@ def construct_delayed_spikes_graph(data, progress_callback, burst_method, delta,
     graph.layout("dot")
     data.graph = graph
 
-    hub_dict = {'Electrode': [], 'Number of connections': [], 'Hub coefficient': []}
+    hub_dict = {'Electrode': [],
+                'Num connections': [],
+                'Hub coefficient': [],
+                'Num outgoing connections': [],
+                'Num incoming connections': [],
+                'Source': [],
+                'Sink': []}
     for node in nodes:
         hub_dict['Electrode'].append(int(node[10:]))
-        hub_dict['Number of connections'].append(nodes[node]['total'])
+        hub_dict['Num connections'].append(nodes[node]['total'])
         hub_dict['Hub coefficient'].append(nodes[node]['total'] / total_num_edges)
+        hub_dict['Num outgoing connections'].append(nodes[node]['total'] - nodes[node]['post'])
+        hub_dict['Num incoming connections'].append(nodes[node]['post'])
+        if nodes[node]['post'] == 0:
+            hub_dict['Source'].append('yes')
+        else:
+            hub_dict['Source'].append('no')
+        if nodes[node]['total'] - nodes[node]['post'] == 0:
+            hub_dict['Sink'].append('yes')
+        else:
+            hub_dict['Sink'].append('no')
 
     data.graph_hub = hub_dict
 
