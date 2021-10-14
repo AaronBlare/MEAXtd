@@ -710,6 +710,7 @@ class MEAXtd(QMainWindow):
         self.logger.info(f"TSR mean: {np.mean(self.data.TSR)}; TSR std: {np.std(self.data.TSR)}")
 
         self.tabs.setCurrentWidget(self.stat_tab)
+        self.tabs.setCurrentWidget(self.main_tab)
 
         excluded_channels = self.excluded_channels
         excluded_channels.sort()
@@ -856,7 +857,8 @@ class MEAXtd(QMainWindow):
 
         self.path_to_save = save_tables_to_file(self.data, self.filename, progress_callback)
 
-        save_plots_to_file(self.path_to_save, progress_callback, self.stat_left_groupbox, self.stat_right_groupbox,
+        save_plots_to_file(self.path_to_save, progress_callback,
+                           self.stat_left_groupbox, self.stat_right_groupbox,
                            self.stat_left_groupbox_layout, self.stat_right_groupbox_layout)
 
         save_params_to_file(self.path_to_save, progress_callback, params_dict)
