@@ -5,7 +5,6 @@ import pyqtgraph.exporters
 import datetime
 import json
 from pathlib import Path
-import cairosvg
 from meaxtd.pdf_export import PDFExporter
 
 
