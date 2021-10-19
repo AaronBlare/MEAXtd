@@ -15,3 +15,4 @@ McsPyDataTools>=0.4.1
 intervaltree>=3.1.0
 pygraphviz>=1.7
 openpyxl>=3.0.7
+CairoSVG>=2.5.2

@@ -9,6 +9,7 @@ from meaxtd.hdf5plot import HDF5PlotXY
 from meaxtd.find_bursts import find_spikes, find_bursts, calculate_characteristics
 from meaxtd.construct_graph import construct_delayed_spikes_graph
 from meaxtd.save_result import save_tables_to_file, save_plots_to_file, save_params_to_file, save_graph_to_file
+from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QLayout, QFrame, QSizePolicy,
 from meaxtd.stat_plots import raster_plot, tsr_plot, colormap_plot, tsr_plot_threshold
 from PySide6.QtCore import Qt, QRunnable, Slot, QThreadPool, QObject, Signal
 from PySide6.QtGui import QIcon, QFont, QAction, QScreen, QPixmap
@@ -16,7 +17,7 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QLayout, QFra
                                QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget, QTabWidget, QSpacerItem,
                                QGroupBox, QGridLayout, QPushButton, QComboBox, QRadioButton, QPlainTextEdit,
                                QProgressBar, QDoubleSpinBox, QSpinBox, QTableWidget, QTableWidgetItem, QHeaderView,
-                               QStyleFactory)
+                               QStyleFactory, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem)
 
 pg.setConfigOption('background', 'w')
 pg.setConfigOption('foreground', 'k')
@@ -104,6 +105,86 @@ class TableWidgetItem(QTableWidgetItem):
             return float(self.text()) < float(other.text())
         except ValueError:
             return self.text() < other.text()
+
+
+class PhotoViewer(QGraphicsView):
+    photoClicked = Signal(QPoint)
+
+    def __init__(self, parent):
+        super(PhotoViewer, self).__init__(parent)
+        self._zoom = 0
+        self._empty = True
+        self._scene = QGraphicsScene(self)
+        self._photo = QGraphicsPixmapItem()
+        self._photo.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
+        self._scene.addItem(self._photo)
+        self.setScene(self._scene)
+        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setBackgroundBrush(QBrush(QColor(255, 255, 255)))
+        self.setFrameShape(QFrame.NoFrame)
+
+    def hasPhoto(self):
+        return not self._empty
+
+    def fitInView(self, scale=True):
+        rect = QRectF(self._photo.pixmap().rect())
+        if not rect.isNull():
+            self.setSceneRect(rect)
+            if self.hasPhoto():
+                unity = self.transform().mapRect(QRectF(0, 0, 1, 1))
+                self.scale(1 / unity.width(), 1 / unity.height())
+                viewrect = self.viewport().rect()
+                scenerect = self.transform().mapRect(rect)
+                factor = min(viewrect.width() / scenerect.width(),
+                             viewrect.height() / scenerect.height())
+                self.scale(factor, factor)
+            self._zoom = 0
+
+    def setPhoto(self, pixmap=None):
+        self._zoom = 0
+        self._scene.clear()
+        self.viewport().update()
+        # if len(self.scene().items()) > 1:
+        #     for item_id in range(len(self.scene().items()) - 1, -1, -1):
+        #         curr_item = self.scene().items()[item_id]
+        #         self.scene().removeItem(curr_item)
+        self._photo = QGraphicsPixmapItem()
+        self._photo.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
+        if pixmap and not pixmap.isNull():
+            self._empty = False
+            self.setDragMode(QGraphicsView.ScrollHandDrag)
+            self._photo.setPixmap(pixmap)
+            self._scene.addItem(self._photo)
+            self.fitInView()
+        else:
+            self._empty = True
+            self.setDragMode(QGraphicsView.NoDrag)
+            self._photo.setPixmap(QPixmap())
+            self._scene.addItem(self._photo)
+
+    def wheelEvent(self, event):
+        if self.hasPhoto():
+            if event.angleDelta().y() > 0:
+                factor = 1.25
+                self._zoom += 1
+            else:
+                factor = 0.8
+                self._zoom -= 1
+            self.scale(factor, factor)
+
+    def toggleDragMode(self):
+        if self.dragMode() == QGraphicsView.ScrollHandDrag:
+            self.setDragMode(QGraphicsView.NoDrag)
+        elif not self._photo.pixmap().isNull():
+            self.setDragMode(QGraphicsView.ScrollHandDrag)
+
+    def mousePressEvent(self, event):
+        if self._photo.isUnderMouse():
+            self.photoClicked.emit(self.mapToScene(event.pos()).toPoint())
+        super(PhotoViewer, self).mousePressEvent(event)
 
 
 class MEAXtd(QMainWindow):
@@ -633,6 +714,9 @@ class MEAXtd(QMainWindow):
         self.logger.info(f"TSR threshold: {np.mean(self.data.TSR) + burst_param * np.std(self.data.TSR)}")
         self.logger.info(f"TSR mean: {np.mean(self.data.TSR)}; TSR std: {np.std(self.data.TSR)}")
 
+        self.tabs.setCurrentWidget(self.stat_tab)
+        self.tabs.setCurrentWidget(self.main_tab)
+
         excluded_channels = self.excluded_channels
         excluded_channels.sort()
         excluded_channels = [channel + 1 for channel in excluded_channels]
@@ -778,7 +862,8 @@ class MEAXtd(QMainWindow):
 
         self.path_to_save = save_tables_to_file(self.data, self.filename, progress_callback)
 
-        save_plots_to_file(self.path_to_save, progress_callback, self.stat_left_groupbox, self.stat_right_groupbox,
+        save_plots_to_file(self.path_to_save, progress_callback,
+                           self.stat_left_groupbox, self.stat_right_groupbox,
                            self.stat_left_groupbox_layout, self.stat_right_groupbox_layout)
 
         save_params_to_file(self.path_to_save, progress_callback, params_dict)
@@ -827,18 +912,15 @@ class MEAXtd(QMainWindow):
         construct_delayed_spikes_graph(self.data, progress_callback, burst_method, delta, num_frames, cutoff, burst_id)
         self.curr_burst_id = burst_id
 
-        self.logger.info(f"Graph for burst {burst_id + 1} built.")
-
-        graph_file = save_graph_to_file(self.path_to_save, progress_callback,
-                                        self.data.graph, self.data.graph_hub, burst_id)
-
-        pixmap = QPixmap.fromImage(graph_file)
-        if pixmap.height() > self.graph_picture_panel.height() or pixmap.width() > self.graph_picture_panel.width():
-            pixmap_scaled = pixmap.scaled(0.9 * self.graph_picture_panel.size(),
-                                          Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            self.graph_picture.setPixmap(pixmap_scaled)
+        if len(self.data.graph_hub['Electrode']) > 0:
+            self.logger.info(f"Graph for burst {burst_id + 1} built.")
+            graph_file = save_graph_to_file(self.path_to_save, progress_callback,
+                                            self.data.graph, self.data.graph_hub, burst_id)
         else:
-            self.graph_picture.setPixmap(pixmap)
+            self.logger.info(f"Graph for burst {burst_id + 1} is empty.")
+            graph_file = None
+
+        self.graph_picture.setPhoto(QPixmap(graph_file))
 
     def process_graph(self):
         if self.data.bursts:
@@ -1323,6 +1405,12 @@ class MEAXtd(QMainWindow):
         self.char_time_label.setFont(self.gbox_font)
         self.char_tab_layout.addWidget(self.char_time_label, 0, 4, 1, 1)
 
+    def choose_burst_cell(self):
+        curr_row = self.graph_table.currentRow()
+        cell_value = self.graph_table.item(curr_row, 0).text()
+        burst_id = int(cell_value)
+        self.burst_id_spinbox.setValue(burst_id)
+
     def create_graph_layout(self):
         self.graph_info_panel = QWidget(self.graph_tab)
         size_policy_graph_left = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -1334,6 +1422,7 @@ class MEAXtd(QMainWindow):
         self.graph_info_panel_layout = QGridLayout(self.graph_info_panel)
 
         self.graph_table = QTableWidget(self.graph_info_panel)
+        self.graph_table.cellClicked.connect(lambda: self.choose_burst_cell())
         self.graph_info_panel_layout.addWidget(self.graph_table, 0, 0, 1, 1)
         self.graph_table.verticalHeader().setVisible(False)
 
@@ -1436,8 +1525,8 @@ class MEAXtd(QMainWindow):
         self.graph_picture_panel.setSizePolicy(size_policy_graph_right)
         self.graph_picture_panel_layout = QVBoxLayout(self.graph_picture_panel)
 
-        self.graph_picture = QLabel(self.graph_picture_panel)
-        self.graph_picture_panel_layout.addWidget(self.graph_picture, alignment=Qt.AlignCenter)
+        self.graph_picture = PhotoViewer(self.graph_picture_panel)
+        self.graph_picture_panel_layout.addWidget(self.graph_picture)
 
         self.graph_tab_layout.addWidget(self.graph_picture_panel)
 
@@ -1834,6 +1923,10 @@ class StatDialog(QDialog):
     def plot_tsr(self, left_layout):
         tplot = tsr_plot(self.data)
         left_layout.layout().itemAtPosition(0, 0).widget().addItem(tplot)
+        left_layout.layout().itemAtPosition(0, 0).widget().plotItem.items[0].opts['symbol'] = None
+        left_layout.layout().itemAtPosition(0, 0).widget().plotItem.items[0].opts['symbolPen'] = None
+        left_layout.layout().itemAtPosition(0, 0).widget().plotItem.items[0].opts['symbolBrush'] = None
+        left_layout.layout().itemAtPosition(0, 0).widget().plotItem.items[0].opts['symbolSize'] = None
         if hasattr(self, 'TSR_threshold'):
             tplot_thr = tsr_plot_threshold(self.data, self.TSR_threshold)
             left_layout.layout().itemAtPosition(0, 0).widget().addItem(tplot_thr)
@@ -1852,7 +1945,10 @@ class StatDialog(QDialog):
             act_bar = right_layout.layout().itemAtPosition(0, 0).widget().plotItem.layout.itemAt(2, 5)
             act_bar.setLevels(values=(0, act_max_value))
         else:
-            act_bar = pg.ColorBarItem(interactive=False, values=(0, act_max_value), cmap=cm, label="Spike times, s")
+            act_bar = pg.ColorBarItem(interactive=False,
+                                      values=(0, act_max_value),
+                                      cmap=cm,
+                                      label="Spike times, ms")
         act_bar.setImageItem(act_plot, insert_in=right_layout.layout().itemAtPosition(0, 0).widget().plotItem)
 
         deact_max_value = np.max(self.data.burst_deactivation)
@@ -1862,7 +1958,10 @@ class StatDialog(QDialog):
             deact_bar = right_layout.layout().itemAtPosition(1, 0).widget().plotItem.layout.itemAt(2, 5)
             deact_bar.setLevels(values=(0, deact_max_value))
         else:
-            deact_bar = pg.ColorBarItem(interactive=False, values=(0, deact_max_value), cmap=cm, label="Spike times, s")
+            deact_bar = pg.ColorBarItem(interactive=False,
+                                        values=(0, deact_max_value),
+                                        cmap=cm,
+                                        label="Spike times, ms")
         deact_bar.setImageItem(deact_plot, insert_in=right_layout.layout().itemAtPosition(1, 0).widget().plotItem)
 
     def remove_plots(self, left_layout, right_layout):

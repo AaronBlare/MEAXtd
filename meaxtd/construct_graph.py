@@ -156,7 +156,10 @@ def construct_delayed_spikes_graph(data, progress_callback, burst_method, delta,
 
     c_ij_unsorted_df = pd.DataFrame.from_dict(c_ij_dict)
     c_ij_sorted_df = c_ij_unsorted_df.sort_values(by=['C_ij_max'], ascending=False)
-    percentile_value = np.percentile(c_ij_sorted_df['C_ij_max'], 100 - cutoff)
+    if len(c_ij_sorted_df['C_ij_max']) > 0:
+        percentile_value = np.percentile(c_ij_sorted_df['C_ij_max'], 100 - cutoff)
+    else:
+        percentile_value = 0
     c_ij_top = c_ij_sorted_df[c_ij_sorted_df['C_ij_max'] > percentile_value]
 
     progress_callback.emit(90)
@@ -185,11 +188,27 @@ def construct_delayed_spikes_graph(data, progress_callback, burst_method, delta,
     graph.layout("dot")
     data.graph = graph
 
-    hub_dict = {'Electrode': [], 'Number of connections': [], 'Hub coefficient': []}
+    hub_dict = {'Electrode': [],
+                'Num connections': [],
+                'Hub coefficient': [],
+                'Num outgoing connections': [],
+                'Num incoming connections': [],
+                'Source': [],
+                'Sink': []}
     for node in nodes:
         hub_dict['Electrode'].append(int(node[10:]))
-        hub_dict['Number of connections'].append(nodes[node]['total'])
+        hub_dict['Num connections'].append(nodes[node]['total'])
         hub_dict['Hub coefficient'].append(nodes[node]['total'] / total_num_edges)
+        hub_dict['Num outgoing connections'].append(nodes[node]['total'] - nodes[node]['post'])
+        hub_dict['Num incoming connections'].append(nodes[node]['post'])
+        if nodes[node]['post'] == 0:
+            hub_dict['Source'].append('yes')
+        else:
+            hub_dict['Source'].append('no')
+        if nodes[node]['total'] - nodes[node]['post'] == 0:
+            hub_dict['Sink'].append('yes')
+        else:
+            hub_dict['Sink'].append('no')
 
     data.graph_hub = hub_dict
 

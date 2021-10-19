@@ -5,6 +5,8 @@ import pyqtgraph.exporters
 import datetime
 import json
 from pathlib import Path
+import cairosvg
+from meaxtd.pdf_export import PDFExporter
 
 
 def save_tables_to_file(data, filepath, progress_callback):
@@ -54,36 +56,65 @@ def save_tables_to_file(data, filepath, progress_callback):
 
 
 def save_plots_to_file(path, progress_callback, left_groupbox, right_groupbox, left_layout, right_layout):
-
-    # tsr_exporter_svg = pg.exporters.SVGExporter(left_layout.layout().itemAtPosition(0, 0).widget().getPlotItem())
-    # tsr_exporter_svg.export(path + 'TSR.svg')
-
-    tsr_exporter_png = pg.exporters.ImageExporter(left_groupbox.layout().itemAtPosition(0, 0).widget().getPlotItem())
-    tsr_exporter_png.export(path + 'TSR.png')
+    tsr_exporter_pdf = PDFExporter(left_layout.layout().itemAtPosition(0, 0).widget().scene())
+    tsr_exporter_pdf.export(path + 'TSR.pdf')
 
     progress_callback.emit(95)
 
-    # plot_exporter_svg = pg.exporters.SVGExporter(left_layout.layout().itemAtPosition(1, 0).widget().getPlotItem())
-    # plot_exporter_svg.export(path + 'plot.svg')
-
-    plot_exporter_png = pg.exporters.ImageExporter(left_groupbox.layout().itemAtPosition(1, 0).widget().getPlotItem())
-    plot_exporter_png.export(path + 'plot.png')
+    plot_exporter_pdf = PDFExporter(left_layout.layout().itemAtPosition(1, 0).widget().scene())
+    plot_exporter_pdf.export(path + 'plot.pdf')
 
     progress_callback.emit(96)
 
-    # act_exporter_svg = pg.exporters.SVGExporter(right_layout.layout().itemAtPosition(0, 0).widget().getPlotItem())
-    # act_exporter_svg.export(path + 'activation.svg')
+    act_exporter_pdf = PDFExporter(right_layout.layout().itemAtPosition(0, 0).widget().scene())
+    act_exporter_pdf.export(path + 'activation.pdf', add_margin=True)
 
-    act_exporter_png = pg.exporters.ImageExporter(right_groupbox.layout().itemAtPosition(0, 0).widget().getPlotItem())
+    progress_callback.emit(97)
+
+    deact_exporter_pdf = PDFExporter(right_layout.layout().itemAtPosition(1, 0).widget().scene())
+    deact_exporter_pdf.export(path + 'deactivation.pdf', add_margin=True)
+
+    progress_callback.emit(97)
+
+    tsr_exporter_png = pg.exporters.ImageExporter(left_groupbox.layout().itemAtPosition(0, 0).widget().scene())
+    tsr_exporter_png.export(path + 'TSR.png')
+
+    plot_exporter_png = pg.exporters.ImageExporter(left_groupbox.layout().itemAtPosition(1, 0).widget().scene())
+    plot_exporter_png.export(path + 'plot.png')
+
+    act_exporter_png = pg.exporters.ImageExporter(right_groupbox.layout().itemAtPosition(0, 0).widget().scene())
     act_exporter_png.export(path + 'activation.png')
 
-    progress_callback.emit(99)
+    deact_exporter_png = pg.exporters.ImageExporter(right_groupbox.layout().itemAtPosition(1, 0).widget().scene())
+    deact_exporter_png.export(path + 'deactivation.png')
 
-    # deact_exporter_svg = pg.exporters.SVGExporter(right_layout.layout().itemAtPosition(1, 0).widget().getPlotItem())
+    # tsr_exporter_svg = pg.exporters.SVGExporter(left_layout.layout().itemAtPosition(0, 0).widget().scene())
+    # tsr_exporter_svg.export(path + 'TSR.svg')
+
+    # tsr_exporter_svg = pg.exporters.SVGExporter(left_layout.layout().itemAtPosition(0, 0).widget().scene())
+    # tsr_svg = tsr_exporter_svg.export(toBytes=True)
+    # tsr_pdf = cairosvg.svg2pdf(tsr_svg, write_to=path + 'TSR.pdf')
+
+    # plot_exporter_svg = pg.exporters.SVGExporter(left_layout.layout().itemAtPosition(1, 0).widget().scene())
+    # plot_exporter_svg.export(path + 'plot.svg')
+
+    # plot_exporter_svg = pg.exporters.SVGExporter(left_layout.layout().itemAtPosition(1, 0).widget().scene())
+    # plot_svg = plot_exporter_svg.export(toBytes=True)
+    # plot_pdf = cairosvg.svg2pdf(plot_svg, write_to=path + 'plot.pdf')
+
+    # act_exporter_svg = pg.exporters.SVGExporter(right_layout.layout().itemAtPosition(0, 0).widget().scene())
+    # act_exporter_svg.export(path + 'activation.svg')
+
+    # act_exporter_svg = pg.exporters.SVGExporter(right_groupbox.layout().itemAtPosition(0, 0).widget().scene())
+    # act_svg = act_exporter_svg.export(toBytes=True)
+    # act_pdf = cairosvg.svg2pdf(act_svg, write_to=path + 'activation.pdf')
+
+    # deact_exporter_svg = pg.exporters.SVGExporter(right_layout.layout().itemAtPosition(1, 0).widget().scene())
     # deact_exporter_svg.export(path + 'deactivation.svg')
 
-    deact_exporter_png = pg.exporters.ImageExporter(right_groupbox.layout().itemAtPosition(1, 0).widget().getPlotItem())
-    deact_exporter_png.export(path + 'deactivation.png')
+    # deact_exporter_svg = pg.exporters.SVGExporter(right_groupbox.layout().itemAtPosition(1, 0).widget().scene())
+    # deact_svg = deact_exporter_svg.export(toBytes=True)
+    # deact_pdf = cairosvg.svg2pdf(deact_svg, write_to=path + 'deactivation.pdf')
 
     progress_callback.emit(98)
 
@@ -93,7 +124,6 @@ def save_plots_to_file(path, progress_callback, left_groupbox, right_groupbox, l
 
 
 def save_params_to_file(path, progress_callback, params_dict):
-
     f = open(path + 'params.txt', 'w')
     f.write('Parameter\tValue\n')
     for key in params_dict:
@@ -110,7 +140,6 @@ def save_params_to_file(path, progress_callback, params_dict):
 
 
 def save_graph_to_file(path, progress_callback, graph, hub, burst_id):
-
     path = f"{path}/graph/"
     if not os.path.isdir(path):
         Path(path).mkdir(parents=True)
