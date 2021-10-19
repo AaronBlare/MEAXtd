@@ -144,10 +144,12 @@ class PhotoViewer(QGraphicsView):
 
     def setPhoto(self, pixmap=None):
         self._zoom = 0
-        if len(self.scene().items()) > 1:
-            for item_id in range(1, len(self.scene().items())):
-                curr_item = self.scene().items()[item_id]
-                self.scene().removeItem(curr_item)
+        self._scene.clear()
+        self.viewport().update()
+        # if len(self.scene().items()) > 1:
+        #     for item_id in range(len(self.scene().items()) - 1, -1, -1):
+        #         curr_item = self.scene().items()[item_id]
+        #         self.scene().removeItem(curr_item)
         self._photo = QGraphicsPixmapItem()
         self._photo.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
         if pixmap and not pixmap.isNull():
@@ -155,11 +157,12 @@ class PhotoViewer(QGraphicsView):
             self.setDragMode(QGraphicsView.ScrollHandDrag)
             self._photo.setPixmap(pixmap)
             self._scene.addItem(self._photo)
+            self.fitInView()
         else:
             self._empty = True
             self.setDragMode(QGraphicsView.NoDrag)
             self._photo.setPixmap(QPixmap())
-        # self.fitInView()
+            self._scene.addItem(self._photo)
 
     def wheelEvent(self, event):
         if self.hasPhoto():
@@ -907,10 +910,13 @@ class MEAXtd(QMainWindow):
         construct_delayed_spikes_graph(self.data, progress_callback, burst_method, delta, num_frames, cutoff, burst_id)
         self.curr_burst_id = burst_id
 
-        self.logger.info(f"Graph for burst {burst_id + 1} built.")
-
-        graph_file = save_graph_to_file(self.path_to_save, progress_callback,
-                                        self.data.graph, self.data.graph_hub, burst_id)
+        if len(self.data.graph_hub['Electrode']) > 0:
+            self.logger.info(f"Graph for burst {burst_id + 1} built.")
+            graph_file = save_graph_to_file(self.path_to_save, progress_callback,
+                                            self.data.graph, self.data.graph_hub, burst_id)
+        else:
+            self.logger.info(f"Graph for burst {burst_id + 1} is empty.")
+            graph_file = None
 
         self.graph_picture.setPhoto(QPixmap(graph_file))
 
