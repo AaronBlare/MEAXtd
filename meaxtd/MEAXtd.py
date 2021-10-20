@@ -1928,8 +1928,8 @@ class StatDialog(QDialog):
         if hasattr(self, 'TSR_threshold'):
             tplot_thr = tsr_plot_threshold(self.data, self.TSR_threshold)
             left_layout.layout().itemAtPosition(0, 0).widget().addItem(tplot_thr)
-        left_layout.layout().itemAtPosition(0, 0).widget().setLimits(yMin=-0.1, yMax=max(self.data.TSR) + 1,
-                                                                     xMin=0, xMax=self.data.time[-1])
+        left_layout.layout().itemAtPosition(0, 0).widget().plotItem.setLimits(yMin=-0.1, yMax=100000,
+                                                                              xMin=0, xMax=self.data.time[-1])
         left_layout.layout().itemAtPosition(0, 0).widget().setYRange(-1, max(self.data.TSR) + 1)
         left_layout.layout().itemAtPosition(0, 0).widget().setXRange(0, self.data.time[-1])
         # left_layout.layout().itemAtPosition(0, 0).widget().getPlotItem().hideAxis('bottom')
