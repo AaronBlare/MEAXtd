@@ -3,7 +3,7 @@ import numpy as np
 
 
 def raster_plot(data, start):
-    start_index = np.where(data.time == start * 60)[0][0]
+    start_index = np.searchsorted(data.time, start, side='left')
     num_signals = data.stream.shape[1]
     num_spikes = 0
     for signal_id in range(0, num_signals):

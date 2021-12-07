@@ -11,11 +11,11 @@ from PySide2.QtGui import QPixmap, QImage, QPainter
 def find_spikes(data, excluded_channels, method, coefficient, start, end, progress_callback):
     num_signals = data.stream.shape[1]
 
-    start_index = np.where(data.time == start * 60)[0][0]
+    start_index = np.searchsorted(data.time, start, side='left')
     if end < int(np.ceil(data.time[-1] / 60)):
-        end_index = np.where(data.time == end * 60)[0][0]
+        end_index = np.searchsorted(data.time, end * 60, side='right') - 1
     else:
-        end_index = np.where(data.time == data.time[-1])[0][0]
+        end_index = np.searchsorted(data.time, data.time[-1], side='right') - 1
 
     total_time_in_ms = int(np.ceil((data.time[end_index] - data.time[start_index]) * 1000))
     data.TSR = np.zeros(int(total_time_in_ms / 50), dtype=int)
@@ -62,7 +62,7 @@ def find_spikes(data, excluded_channels, method, coefficient, start, end, progre
             data.spike_stream[signal_id] = np.empty(len(data.stream[:, signal_id]))
             data.spike_stream[signal_id][:] = np.nan
             for peak_id in range(0, len(spikes)):
-                TSR_index = int(np.ceil(spikes[peak_id] * data.time[1] * 1000 / 50))
+                TSR_index = int(np.ceil(spikes[peak_id] * (1 / data.fs) * 1000 / 50))
                 data.TSR[TSR_index - 1] += 1
                 if data.TSR_channels[TSR_index - 1]:
                     data.TSR_channels[TSR_index - 1].append(signal_id)
@@ -123,11 +123,11 @@ def find_burstlets(data, excluded_channels, spike_method, spike_coeff, burst_win
     if not data.spikes:
         find_spikes(data, excluded_channels, spike_method, spike_coeff, start, end, progress_callback)
 
-    start_index = np.where(data.time == start * 60)[0][0]
+    start_index = np.searchsorted(data.time, start, side='left')
     if end < int(np.ceil(data.time[-1] / 60)):
-        end_index = np.where(data.time == end * 60)[0][0]
+        end_index = np.searchsorted(data.time, end * 60, side='right') - 1
     else:
-        end_index = np.where(data.time == data.time[-1])[0][0]
+        end_index = np.searchsorted(data.time, data.time[-1], side='right') - 1
 
     num_signals = data.stream.shape[1]
     window = 10 * burst_window  # sampling frequency 0.1 ms
@@ -189,11 +189,11 @@ def create_interval_tree(data):
 
 def find_bursts(data, excluded_channels, spike_method, spike_coeff, burst_method, burst_window, burst_param,
                 start, end, progress_callback):
-    start_index = np.where(data.time == start * 60)[0][0]
+    start_index = np.searchsorted(data.time, start, side='left')
     if end < int(np.ceil(data.time[-1] / 60)):
-        end_index = np.where(data.time == end * 60)[0][0]
+        end_index = np.searchsorted(data.time, end * 60, side='right') - 1
     else:
-        end_index = np.where(data.time == data.time[-1])[0][0]
+        end_index = np.searchsorted(data.time, data.time[-1], side='right') - 1
 
     signal_len = len(data.stream[start_index:end_index, 0])
     num_signals = data.stream.shape[1]
@@ -287,10 +287,10 @@ def find_bursts(data, excluded_channels, spike_method, spike_coeff, burst_method
                 curr_channels = list(set(curr_channels))
                 curr_channels.sort()
                 for curr_channel in curr_channels:
-                    data.bursts_starts[curr_channel].append(int(interval_start * 50 / (data.time[1] * 1000)))
-                    data.bursts_ends[curr_channel].append(int(interval_end * 50 / (data.time[1] * 1000)))
-                data.bursts.append({'start': int(interval_start * 50 / (data.time[1] * 1000)),
-                                    'end': int(interval_end * 50 / (data.time[1] * 1000)),
+                    data.bursts_starts[curr_channel].append(int(interval_start * 50 / ((1 / data.fs) * 1000)))
+                    data.bursts_ends[curr_channel].append(int(interval_end * 50 / ((1 / data.fs) * 1000)))
+                data.bursts.append({'start': int(interval_start * 50 / ((1 / data.fs) * 1000)),
+                                    'end': int(interval_end * 50 / ((1 / data.fs) * 1000)),
                                     'channels': curr_channels})
 
         burst_activation_vector = np.empty(shape=(len(data.bursts), num_signals))
@@ -373,11 +373,11 @@ def find_bursts(data, excluded_channels, spike_method, spike_coeff, burst_method
 def calculate_characteristics(data, start, end, progress_callback):
     progress_callback.emit(80)
 
-    start_index = np.where(data.time == start * 60)[0][0]
+    start_index = np.searchsorted(data.time, start, side='left')
     if end < int(np.ceil(data.time[-1] / 60)):
-        end_index = np.where(data.time == end * 60)[0][0]
+        end_index = np.searchsorted(data.time, end * 60, side='right') - 1
     else:
-        end_index = np.where(data.time == data.time[-1])[0][0]
+        end_index = np.searchsorted(data.time, data.time[-1], side='right') - 1
 
     num_signals = data.stream.shape[1]
     num_seconds = data.time[end_index] - data.time[start_index]
@@ -475,8 +475,8 @@ def calculate_characteristics(data, start, end, progress_callback):
             signal_list = curr_burst['channels']
             for signal_id in signal_list:
                 num_bursts_per_channel[signal_id] += 1
-            curr_start = int(np.ceil(curr_burst['start'] * data.time[1] * 1000 / 50))
-            curr_end = int(np.ceil(curr_burst['end'] * data.time[1] * 1000 / 50))
+            curr_start = int(np.ceil(curr_burst['start'] * (1 / data.fs) * 1000 / 50))
+            curr_end = int(np.ceil(curr_burst['end'] * (1 / data.fs) * 1000 / 50))
             curr_num_spikes += np.sum([data.TSR[i] for i in range(curr_start, curr_end)])
         bursts_starts.append(data.time[start_index] + data.time[activation_time])
         bursts_ends.append(data.time[start_index] + data.time[deactivation_time])

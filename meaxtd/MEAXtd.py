@@ -1727,7 +1727,7 @@ class PlotDialog(QDialog):
                 plot_grid.layout().itemAtPosition(col_id, row_id).widget().addItem(bursts_borders)
 
     def change_range_next(self, plot_grid, data_type, signal_id):
-        start_index = np.where(self.data.time == self.start * 60)[0][0]
+        start_index = np.searchsorted(self.data.time, self.start * 60, side='left')
         curr_signal = signal_id - 1
         if data_type == 'spike':
             if getattr(self, 'spike_id', None) is None:
@@ -1787,7 +1787,7 @@ class PlotDialog(QDialog):
                 plot_grid.layout().itemAtPosition(0, 0).widget().setXRange(left_border, right_border)
 
     def change_range_prev(self, plot_grid, data_type, signal_id):
-        start_index = np.where(self.data.time == self.start * 60)[0][0]
+        start_index = np.searchsorted(self.data.time, self.start * 60, side='left')
         curr_signal = signal_id - 1
         if data_type == 'spike':
             if getattr(self, 'spike_id', None) is None:
