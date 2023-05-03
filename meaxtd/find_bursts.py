@@ -11,7 +11,7 @@ from PySide2.QtGui import QPixmap, QImage, QPainter
 def find_spikes(data, excluded_channels, method, coefficient, start, end, progress_callback):
     num_signals = data.stream.shape[1]
 
-    start_index = np.searchsorted(data.time, start, side='left')
+    start_index = np.searchsorted(data.time, start * 60, side='left')
     if end < int(np.ceil(data.time[-1] / 60)):
         end_index = np.searchsorted(data.time, end * 60, side='right') - 1
     else:
@@ -123,7 +123,7 @@ def find_burstlets(data, excluded_channels, spike_method, spike_coeff, burst_win
     if not data.spikes:
         find_spikes(data, excluded_channels, spike_method, spike_coeff, start, end, progress_callback)
 
-    start_index = np.searchsorted(data.time, start, side='left')
+    start_index = np.searchsorted(data.time, start * 60, side='left')
     if end < int(np.ceil(data.time[-1] / 60)):
         end_index = np.searchsorted(data.time, end * 60, side='right') - 1
     else:
@@ -189,7 +189,7 @@ def create_interval_tree(data):
 
 def find_bursts(data, excluded_channels, spike_method, spike_coeff, burst_method, burst_window, burst_param,
                 start, end, progress_callback):
-    start_index = np.searchsorted(data.time, start, side='left')
+    start_index = np.searchsorted(data.time, start * 60, side='left')
     if end < int(np.ceil(data.time[-1] / 60)):
         end_index = np.searchsorted(data.time, end * 60, side='right') - 1
     else:
@@ -373,7 +373,7 @@ def find_bursts(data, excluded_channels, spike_method, spike_coeff, burst_method
 def calculate_characteristics(data, start, end, progress_callback):
     progress_callback.emit(80)
 
-    start_index = np.searchsorted(data.time, start, side='left')
+    start_index = np.searchsorted(data.time, start * 60, side='left')
     if end < int(np.ceil(data.time[-1] / 60)):
         end_index = np.searchsorted(data.time, end * 60, side='right') - 1
     else:
@@ -592,6 +592,8 @@ def calculate_characteristics(data, start, end, progress_callback):
         del finishes[-1]
         del num_bursts_each_minute[-1]
         del num_spikes_each_minute[-1]
+        del num_small_bursts_each_minute[-1]
+        del num_large_bursts_each_minute[-1]
 
     data.time_characteristics['Start'] = starts
     data.time_characteristics['End'] = finishes
